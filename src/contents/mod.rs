@@ -1,11 +1,9 @@
 pub mod entropy;
 pub mod key;
-pub mod profile;
 
 pub enum Content {
     Entropy(entropy::Entropy),
     Key(key::Key),
-    Profile(profile::Profile),
 }
 
 impl Content {

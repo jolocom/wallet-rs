@@ -1,3 +1,7 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct Entropy {
-    id: String,
+    pub entropy_type: Vec<String>,
+    value: Vec<u8>,
 }

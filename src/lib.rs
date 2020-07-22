@@ -1,3 +1,7 @@
+pub mod contents;
+pub mod locked;
+pub mod unlocked;
+
 #[cfg(test)]
 mod tests {
     #[test]
