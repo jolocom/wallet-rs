@@ -18,7 +18,8 @@ impl LockedWallet {
         sha3.input(key);
         let pass = sha3.result();
 
-        let aes = SymmetricEncryptor::<Aes256Gcm>::default();
+        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
+
         from_str(
             std::str::from_utf8(
                 &aes.decrypt_easy(self.id.as_bytes(), &self.ciphertext)

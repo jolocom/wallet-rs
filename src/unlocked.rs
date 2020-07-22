@@ -6,6 +6,7 @@ use crate::{
     locked::LockedWallet,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::to_string;
 use std::collections::HashMap;
 use ursa::{
     encryption::symm::prelude::*,
@@ -35,10 +36,10 @@ impl UnlockedWallet {
         }
     }
 
-    pub fn new_key(&self, key_type: KeyType) -> Result<String, String> {
-        let id = Uuid::new_v4().urn().to_string();
+    pub fn new_key(&mut self, key_type: KeyType) -> Result<String, String> {
+        let id = Uuid::new_v4().to_urn().to_string();
         self.contents
-            .insert(id, Content::Key(Key::random_pair(key_type)?));
+            .insert(id.clone(), Content::Key(Key::random_pair(key_type)?));
         Ok(id)
     }
 
@@ -74,10 +75,16 @@ impl UnlockedWallet {
         sha3.input(key);
         let pass = sha3.result();
 
-        let aes = SymmetricEncryptor::<Aes256Gcm>::default();
+        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
 
         Ok(LockedWallet {
-            encrypted_data: aes.encrypt_easy(self.id, self).map_err(|e| e.to_string())?,
+            id: self.id.clone(),
+            ciphertext: aes
+                .encrypt_easy(
+                    self.id.as_bytes(),
+                    &to_string(&self).map_err(|e| e.to_string())?.as_bytes(),
+                )
+                .map_err(|e| e.to_string())?,
         })
     }
 }

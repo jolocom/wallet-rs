@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use ursa::{
+    encryption::symm::prelude::*,
     keys::{PrivateKey, PublicKey},
     signatures::prelude::*,
 };
@@ -48,7 +49,7 @@ impl Key {
         }
     }
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, String> {
-        match self.private_key {
+        match &self.private_key {
             Some(k) => match self.key_type {
                 KeyType::Ed25519VerificationKey2018 => {
                     let ed = Ed25519Sha512::new();
@@ -79,7 +80,7 @@ impl Key {
         }
     }
     pub fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, String> {
-        match self.private_key {
+        match &self.private_key {
             Some(k) => match self.key_type {
                 // default use xChaCha20Poly1905
                 KeyType::X25519KeyAgreementKey2019 => todo!(),
