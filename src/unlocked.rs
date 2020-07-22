@@ -21,9 +21,29 @@ pub struct UnlockedWallet {
     contents: HashMap<String, Content>,
 }
 
-pub impl UnlockedWallet {
-    pub fn sign_raw(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, 'str> {
-        match self.get_content(key_ref) {
+impl UnlockedWallet {
+    pub fn new(id: &str) -> Self {
+        UnlockedWallet {
+            context: vec![
+                "https://www.w3.org/2018/credentials/v1".to_string(),
+                "https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json"
+                    .to_string(),
+            ],
+            id: id.to_string(),
+            wallet_type: vec!["UniversalWallet2020".to_string()],
+            contents: HashMap::new(),
+        }
+    }
+
+    pub fn new_key(&self, key_type: KeyType) -> Result<String, String> {
+        let id = Uuid::new_v4().urn().to_string();
+        self.contents
+            .insert(id, Content::Key(Key::random_pair(key_type)?));
+        Ok(id)
+    }
+
+    pub fn sign_raw(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
+        match self.contents.get(key_ref) {
             Some(c) => match c {
                 Content::Key(k) => k.sign(data),
                 _ => Err("incorrect content type".to_string()),

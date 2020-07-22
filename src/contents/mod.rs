@@ -1,17 +1,21 @@
 pub mod entropy;
 pub mod key;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct ContentEntity {
+    #[serde(rename = "@context")]
+    pub context: Vec<String>,
+    pub id: String,
+
+    #[serde(flatten)]
+    pub content: Content,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Content {
     Entropy(entropy::Entropy),
     Key(key::Key),
-}
-
-impl Content {
-    fn id(&self) -> &str {
-        match self {
-            Self::Profile(p) => p.id,
-            Self::Key(k) => k.id,
-            Self::Entropy(e) => e.id,
-        }
-    }
 }
