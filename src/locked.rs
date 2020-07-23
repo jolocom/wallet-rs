@@ -13,6 +13,13 @@ pub struct LockedWallet {
 }
 
 impl LockedWallet {
+    pub fn new(id: String, ct: Vec<u8>) -> Self {
+        Self {
+            id: id,
+            ciphertext: ct,
+        }
+    }
+
     pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, String> {
         let mut sha3 = Sha3_256::new();
         sha3.input(key);
