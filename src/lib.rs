@@ -2,10 +2,34 @@ pub mod contents;
 pub mod locked;
 pub mod unlocked;
 
+pub mod prelude {
+    pub use crate::contents::key::KeyType;
+    pub use crate::locked::LockedWallet;
+    pub use crate::unlocked::UnlockedWallet;
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::prelude::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn it_works() -> Result<(), String> {
+        let mut w = UnlockedWallet::new("thing");
+        let kref = w.new_key(KeyType::Ed25519VerificationKey2018)?;
+        let message = "hi there";
+        let sig = w.sign_raw(message.as_bytes(), &kref)?;
+
+        assert_eq!(Ok(true), w.verify_raw(message.as_bytes(), &kref, &sig));
+
+        let lw = w.lock(message.as_bytes())?;
+
+        let uw = lw.unlock(message.as_bytes())?;
+
+        // let sig2 = uw.sign_raw(message.as_bytes(), &kref)?;
+
+        assert_eq!(Ok(true), w.verify_raw(message.as_bytes(), &kref, &sig));
+        // assert_eq!(Ok(true), uw.verify_raw(message.as_bytes(), &kref, &sig2));
+
+        Ok(())
     }
 }

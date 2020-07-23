@@ -20,13 +20,10 @@ impl LockedWallet {
 
         let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
 
-        from_str(
-            std::str::from_utf8(
-                &aes.decrypt_easy(self.id.as_bytes(), &self.ciphertext)
-                    .map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?
+        let dec = aes
+            .decrypt_easy(self.id.as_bytes(), &self.ciphertext)
+            .map_err(|e| e.to_string())?;
+
+        from_str(std::str::from_utf8(&dec).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
     }
 }

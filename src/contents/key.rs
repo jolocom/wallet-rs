@@ -5,14 +5,12 @@ use ursa::{
     signatures::prelude::*,
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Key {
     pub controller: Vec<String>,
     #[serde(rename = "type")]
     pub key_type: KeyType,
-    #[serde(flatten)]
     pub public_key: PublicKey,
-    #[serde(flatten)]
     private_key: Option<PrivateKey>,
 }
 
@@ -96,9 +94,16 @@ impl Key {
             _ => Err("wrong key type".to_string()),
         }
     }
+
+    pub fn clean(&self) -> Self {
+        Self {
+            private_key: None,
+            ..self.clone()
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum KeyType {
     JwsVerificationKey2020,
     EcdsaSecp256k1VerificationKey2019,

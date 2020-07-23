@@ -1,7 +1,7 @@
 use crate::{
     contents::{
         key::{Key, KeyType},
-        Content,
+        Content, ContentEntity,
     },
     locked::LockedWallet,
 };
@@ -16,10 +16,11 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct UnlockedWallet {
+    #[serde(rename = "@context")]
     pub context: Vec<String>,
     pub id: String,
     pub wallet_type: Vec<String>,
-    contents: HashMap<String, Content>,
+    contents: HashMap<String, ContentEntity>,
 }
 
 impl UnlockedWallet {
@@ -38,14 +39,35 @@ impl UnlockedWallet {
 
     pub fn new_key(&mut self, key_type: KeyType) -> Result<String, String> {
         let id = Uuid::new_v4().to_urn().to_string();
-        self.contents
-            .insert(id.clone(), Content::Key(Key::random_pair(key_type)?));
+        self.contents.insert(
+            id.clone(),
+            ContentEntity {
+                context: vec!["https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json".to_string()],
+                id: id.clone(),
+                content: Content::Key(
+                    Key::random_pair(key_type)?.controller(vec![self.id.clone()]),
+                ),
+            },
+        );
         Ok(id)
+    }
+    pub fn get_keys(&self) -> Vec<ContentEntity> {
+        self.contents
+            .iter()
+            .filter_map(|(_, content)| match &content.content {
+                Content::Key(k) => Some(ContentEntity {
+                    context: content.context.clone(),
+                    id: content.id.clone(),
+                    content: Content::Key(k.clean()),
+                }),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn sign_raw(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
-            Some(c) => match c {
+            Some(c) => match &c.content {
                 Content::Key(k) => k.sign(data),
                 _ => Err("incorrect content type".to_string()),
             },
@@ -54,7 +76,7 @@ impl UnlockedWallet {
     }
     pub fn verify_raw(&self, data: &[u8], key_ref: &str, signature: &[u8]) -> Result<bool, String> {
         match self.contents.get(key_ref) {
-            Some(c) => match c {
+            Some(c) => match &c.content {
                 Content::Key(k) => k.verify(data, signature),
                 _ => Err("incorrect content type".to_string()),
             },
@@ -63,7 +85,7 @@ impl UnlockedWallet {
     }
     pub fn decrypt(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
-            Some(c) => match c {
+            Some(c) => match &c.content {
                 Content::Key(k) => k.decrypt(data),
                 _ => Err("incorrect content type".to_string()),
             },
