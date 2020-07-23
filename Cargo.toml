@@ -1,5 +1,5 @@
 [package]
-name = "wallet-rs"
+name = "wallet_rs"
 version = "0.1.0"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>"]
 edition = "2018"
