@@ -1,3 +1,4 @@
+use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 use ursa::{
     encryption::symm::prelude::*,
@@ -113,6 +114,24 @@ pub enum KeyType {
     X25519KeyAgreementKey2019,
     SchnorrSecp256k1VerificationKey2019,
     EcdsaSecp256k1RecoveryMethod2020,
+}
+
+impl FromStr for KeyType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "JwsVerificationKey2020" => Ok(Self::JwsVerificationKey2020),
+            "EcdsaSecp256k1VerificationKey2019" => Ok(Self::EcdsaSecp256k1VerificationKey2019),
+            "Ed25519VerificationKey2018" => Ok(Self::Ed25519VerificationKey2018),
+            "GpgVerificationKey2020" => Ok(Self::GpgVerificationKey2020),
+            "RsaVerificationKey2018" => Ok(Self::RsaVerificationKey2018),
+            "X25519KeyAgreementKey2019" => Ok(Self::X25519KeyAgreementKey2019),
+            "SchnorrSecp256k1VerificationKey2019" => Ok(Self::SchnorrSecp256k1VerificationKey2019),
+            "EcdsaSecp256k1RecoveryMethod2020" => Ok(Self::EcdsaSecp256k1RecoveryMethod2020),
+            _ => Err("No Such Key Type".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
