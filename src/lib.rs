@@ -2,6 +2,12 @@ pub mod contents;
 pub mod locked;
 pub mod unlocked;
 
+use ursa::encryption::random_vec;
+
+pub fn get_random(len: usize) -> Result<Vec<u8>, String> {
+    random_vec(len).map_err(|e| e.to_string())
+}
+
 pub mod prelude {
     pub use crate::contents::key::KeyType;
     pub use crate::locked::LockedWallet;
