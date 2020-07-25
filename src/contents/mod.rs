@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ContentEntity {
-    #[serde(rename = "@context")]
+    #[serde(rename = "@context", default)]
     pub context: Vec<String>,
     pub id: String,
 

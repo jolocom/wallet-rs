@@ -96,20 +96,15 @@ impl UnlockedWallet {
             None => Err("no key found".to_string()),
         }
     }
-    pub fn verify_raw(&self, data: &[u8], key_ref: &str, signature: &[u8]) -> Result<bool, String> {
+    pub fn decrypt(
+        &self,
+        data: &[u8],
+        aad: Option<&[u8]>,
+        key_ref: &str,
+    ) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
-                Content::KeyPair(kp) => kp.public_key.verify(data, signature),
-                Content::PublicKey(pk) => pk.verify(data, signature),
-                _ => Err("incorrect content type".to_string()),
-            },
-            None => Err("no key found".to_string()),
-        }
-    }
-    pub fn decrypt(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
-        match self.contents.get(key_ref) {
-            Some(c) => match &c.content {
-                Content::KeyPair(k) => k.decrypt(data),
+                Content::KeyPair(k) => k.decrypt(data, aad),
                 _ => Err("incorrect content type".to_string()),
             },
             None => Err("no key found".to_string()),
