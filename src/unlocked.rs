@@ -58,8 +58,11 @@ impl UnlockedWallet {
                     .to_string()],
             })),
         };
-        self.contents.insert(id.clone(), pk_info.clone());
-        Ok(pk_info)
+        self.contents.insert(id.clone(), pk_info);
+        match self.get_key(&id) {
+            Some(pk) => Ok(pk),
+            None => Err("Error Inserting Key".to_string()),
+        }
     }
 
     pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {

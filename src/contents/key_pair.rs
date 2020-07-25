@@ -4,6 +4,7 @@ use ursa::{encryption::symm::prelude::*, keys::PrivateKey, signatures::prelude::
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct KeyPair {
+    #[serde(flatten)]
     pub public_key: PublicKeyInfo,
     private_key: PrivateKey,
 }
