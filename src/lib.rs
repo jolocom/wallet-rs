@@ -24,9 +24,9 @@ mod tests {
     #[test]
     fn it_works() -> Result<(), String> {
         let mut w = UnlockedWallet::new("thing");
-        let kref = w.new_key(KeyType::Ed25519VerificationKey2018, None)?;
+        let pk_info = w.new_key(KeyType::Ed25519VerificationKey2018, None)?;
         let message = "hi there";
-        let sig = w.sign_raw(message.as_bytes(), &kref)?;
+        let sig = w.sign_raw(message.as_bytes(), pk_info.id)?;
 
         assert_eq!(Ok(true), w.verify_raw(message.as_bytes(), &kref, &sig));
 

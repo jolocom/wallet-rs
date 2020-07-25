@@ -38,24 +38,28 @@ impl UnlockedWallet {
         &mut self,
         key_type: KeyType,
         key_controller: Option<Vec<String>>,
-    ) -> Result<String, String> {
+    ) -> Result<ContentEntity, String> {
         let id = Uuid::new_v4().to_urn().to_string();
         let kp = KeyPair::random_pair(key_type)?;
         let pk = kp.public_key.clone();
-        self.contents.insert(
-            id.clone(),
-            ContentEntity {
-                context: vec!["https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json".to_string()],
-                id: id.clone(),
-                content: Content::KeyPair(
-                    kp.controller(match key_controller {
-                        Some(c) => c,
-                        None => vec![[self.id.clone(), base64::encode_config(pk.public_key, base64::URL_SAFE)].join("#").to_string()],
-                    }
-                )),
-            },
-        );
-        Ok(id)
+        let pk_info = ContentEntity {
+            context: vec![
+                "https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json"
+                    .to_string(),
+            ],
+            id: id.clone(),
+            content: Content::KeyPair(kp.controller(match key_controller {
+                Some(c) => c,
+                None => vec![[
+                        self.id.clone(),
+                        base64::encode_config(pk.public_key, base64::URL_SAFE),
+                    ]
+                    .join("#")
+                    .to_string()],
+            })),
+        };
+        self.contents.insert(id.clone(), pk_info.clone());
+        Ok(pk_info)
     }
 
     pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
