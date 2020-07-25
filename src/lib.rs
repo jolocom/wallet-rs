@@ -12,7 +12,7 @@ pub mod prelude {
     pub use crate::contents::{
         key_pair::KeyPair,
         public_key_info::{KeyType, PublicKeyInfo},
-        Content,
+        Content, ContentEntity,
     };
     pub use crate::locked::LockedWallet;
     pub use crate::unlocked::UnlockedWallet;

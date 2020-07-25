@@ -7,6 +7,7 @@ pub struct PublicKeyInfo {
     pub controller: Vec<String>,
     #[serde(rename = "type")]
     pub key_type: KeyType,
+    #[serde(rename = "publicKeyHex")]
     pub public_key: PublicKey,
 }
 
