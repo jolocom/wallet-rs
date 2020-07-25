@@ -1,5 +1,6 @@
 pub mod entropy;
 pub mod key_pair;
+pub mod public_key_info;
 
 use serde::{Deserialize, Serialize};
 
@@ -18,5 +19,5 @@ pub struct ContentEntity {
 pub enum Content {
     Entropy(entropy::Entropy),
     KeyPair(key_pair::KeyPair),
-    PublicKey(key_pair::PublicKeyInfo),
+    PublicKey(public_key_info::PublicKeyInfo),
 }

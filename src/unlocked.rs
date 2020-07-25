@@ -1,8 +1,5 @@
 use crate::{
-    contents::{
-        key_pair::{KeyPair, KeyType},
-        Content, ContentEntity,
-    },
+    contents::{key_pair::KeyPair, public_key_info::KeyType, Content, ContentEntity},
     locked::LockedWallet,
 };
 use serde::{Deserialize, Serialize};
@@ -53,7 +50,7 @@ impl UnlockedWallet {
                 content: Content::KeyPair(
                     kp.controller(match key_controller {
                         Some(c) => c,
-                        None => vec![[self.id.clone(), base64::encode_config(pk, base64::URL_SAFE)].join("#").to_string()],
+                        None => vec![[self.id.clone(), base64::encode_config(pk.public_key, base64::URL_SAFE)].join("#").to_string()],
                     }
                 )),
             },
@@ -102,7 +99,8 @@ impl UnlockedWallet {
     pub fn verify_raw(&self, data: &[u8], key_ref: &str, signature: &[u8]) -> Result<bool, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
-                Content::KeyPair(k) => k.verify(data, signature),
+                Content::KeyPair(kp) => kp.public_key.verify(data, signature),
+                Content::PublicKey(pk) => pk.verify(data, signature),
                 _ => Err("incorrect content type".to_string()),
             },
             None => Err("no key found".to_string()),
