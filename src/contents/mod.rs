@@ -1,9 +1,9 @@
 pub mod entropy;
-pub mod key;
+pub mod key_pair;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ContentEntity {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
@@ -13,9 +13,10 @@ pub struct ContentEntity {
     pub content: Content,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Content {
     Entropy(entropy::Entropy),
-    Key(key::Key),
+    KeyPair(key_pair::KeyPair),
+    PublicKey(key_pair::PublicKeyInfo),
 }

@@ -9,7 +9,7 @@ pub fn get_random(len: usize) -> Result<Vec<u8>, String> {
 }
 
 pub mod prelude {
-    pub use crate::contents::key::KeyType;
+    pub use crate::contents::key_pair::KeyType;
     pub use crate::locked::LockedWallet;
     pub use crate::unlocked::UnlockedWallet;
 }

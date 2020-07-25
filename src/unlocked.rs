@@ -1,6 +1,6 @@
 use crate::{
     contents::{
-        key::{Key, KeyType},
+        key_pair::{KeyPair, KeyType},
         Content, ContentEntity,
     },
     locked::LockedWallet,
@@ -43,14 +43,14 @@ impl UnlockedWallet {
         key_controller: Option<Vec<String>>,
     ) -> Result<String, String> {
         let id = Uuid::new_v4().to_urn().to_string();
-        let kp = Key::random_pair(key_type)?;
+        let kp = KeyPair::random_pair(key_type)?;
         let pk = kp.public_key.clone();
         self.contents.insert(
             id.clone(),
             ContentEntity {
                 context: vec!["https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json".to_string()],
                 id: id.clone(),
-                content: Content::Key(
+                content: Content::KeyPair(
                     kp.controller(match key_controller {
                         Some(c) => c,
                         None => vec![[self.id.clone(), base64::encode_config(pk, base64::URL_SAFE)].join("#").to_string()],
@@ -60,16 +60,32 @@ impl UnlockedWallet {
         );
         Ok(id)
     }
+
+    pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
+        let c = self.contents.get(key_ref)?;
+        Some(ContentEntity {
+            context: c.context.clone(),
+            id: c.id.clone(),
+            content: match &c.content {
+                Content::KeyPair(kp) => Content::PublicKey(kp.clean()),
+                Content::PublicKey(pk) => Content::PublicKey(pk.clone()),
+                _ => return None,
+            },
+        })
+    }
+
     pub fn get_keys(&self) -> Vec<ContentEntity> {
         self.contents
             .iter()
-            .filter_map(|(_, content)| match &content.content {
-                Content::Key(k) => Some(ContentEntity {
-                    context: content.context.clone(),
-                    id: content.id.clone(),
-                    content: Content::Key(k.clean()),
-                }),
-                _ => None,
+            .filter_map(|(_, content_entity)| {
+                Some(ContentEntity {
+                    content: Content::PublicKey(match &content_entity.content {
+                        Content::KeyPair(kp) => kp.clean(),
+                        Content::PublicKey(pk) => pk.clone(),
+                        _ => return None,
+                    }),
+                    ..content_entity.clone()
+                })
             })
             .collect()
     }
@@ -77,7 +93,7 @@ impl UnlockedWallet {
     pub fn sign_raw(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
-                Content::Key(k) => k.sign(data),
+                Content::KeyPair(k) => k.sign(data),
                 _ => Err("incorrect content type".to_string()),
             },
             None => Err("no key found".to_string()),
@@ -86,7 +102,7 @@ impl UnlockedWallet {
     pub fn verify_raw(&self, data: &[u8], key_ref: &str, signature: &[u8]) -> Result<bool, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
-                Content::Key(k) => k.verify(data, signature),
+                Content::KeyPair(k) => k.verify(data, signature),
                 _ => Err("incorrect content type".to_string()),
             },
             None => Err("no key found".to_string()),
@@ -95,7 +111,7 @@ impl UnlockedWallet {
     pub fn decrypt(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
-                Content::Key(k) => k.decrypt(data),
+                Content::KeyPair(k) => k.decrypt(data),
                 _ => Err("incorrect content type".to_string()),
             },
             None => Err("no key found".to_string()),
