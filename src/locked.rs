@@ -13,9 +13,9 @@ pub struct LockedWallet {
 }
 
 impl LockedWallet {
-    pub fn new(id: String, ct: Vec<u8>) -> Self {
+    pub fn new(id: &str, ct: Vec<u8>) -> Self {
         Self {
-            id: id,
+            id: id.to_string(),
             ciphertext: ct,
         }
     }
