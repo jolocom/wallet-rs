@@ -58,10 +58,13 @@ impl KeyPair {
             _ => Err("wrong key type".to_string()),
         }
     }
-    pub fn decrypt(&self, data: &[u8], aad: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&self, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
         match self.public_key.key_type {
             // default use xChaCha20Poly1905
-            KeyType::X25519KeyAgreementKey2019 => todo!(),
+            KeyType::X25519KeyAgreementKey2019 => EncryptorType::XChaCha20Poly1305
+                .gen_encryptor(&self.private_key)
+                .encrypt_easy(aad, data)
+                .map_err(|e| e.to_string()),
             _ => Err("wrong key type".to_string()),
         }
     }

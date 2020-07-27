@@ -94,7 +94,7 @@ impl UnlockedWallet {
             .collect()
     }
 
-    pub fn sign_raw(&self, data: &[u8], key_ref: &str) -> Result<Vec<u8>, String> {
+    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
                 Content::KeyPair(k) => k.sign(data),
@@ -103,12 +103,7 @@ impl UnlockedWallet {
             None => Err("no key found".to_string()),
         }
     }
-    pub fn decrypt(
-        &self,
-        data: &[u8],
-        aad: Option<&[u8]>,
-        key_ref: &str,
-    ) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
                 Content::KeyPair(k) => k.decrypt(data, aad),

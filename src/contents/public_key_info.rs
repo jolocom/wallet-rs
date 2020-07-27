@@ -21,7 +21,10 @@ impl PublicKeyInfo {
     pub fn encrypt(&self, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
         match self.key_type {
             // default use xChaCha20Poly1905
-            KeyType::X25519KeyAgreementKey2019 => todo!(),
+            KeyType::X25519KeyAgreementKey2019 => EncryptorType::XChaCha20Poly1305
+                .gen_encryptor(&self.public_key)
+                .decrypt_easy(aad, data)
+                .map_err(|e| e.to_string()),
             _ => Err("wrong key type".to_string()),
         }
     }
