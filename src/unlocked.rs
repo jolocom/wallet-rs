@@ -78,6 +78,31 @@ impl UnlockedWallet {
         })
     }
 
+    pub fn get_key_by_controller(&self, controller: &str) -> Option<ContentEntity> {
+        self.contents.iter().find_map(|(_, content_entity)| {
+            Some(ContentEntity {
+                content: Content::PublicKey(match &content_entity.content {
+                    Content::KeyPair(kp) => {
+                        if kp.public_key.controller.iter().any(|c| c == controller) {
+                            kp.clean()
+                        } else {
+                            return None;
+                        }
+                    }
+                    Content::PublicKey(pk) => {
+                        if pk.controller.iter().any(|c| c == controller) {
+                            pk.clone()
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }),
+                ..content_entity.clone()
+            })
+        })
+    }
+
     pub fn get_keys(&self) -> Vec<ContentEntity> {
         self.contents
             .iter()

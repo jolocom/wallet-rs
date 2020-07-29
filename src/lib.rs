@@ -27,7 +27,7 @@ mod tests {
         let mut w = UnlockedWallet::new("thing");
         let pk_info = w.new_key(KeyType::Ed25519VerificationKey2018, None)?;
         let message = "hi there";
-        let sig = w.sign_raw(message.as_bytes(), &pk_info.id)?;
+        let sig = w.sign_raw(&pk_info.id, message.as_bytes())?;
 
         print!(
             "\n{}\n",
