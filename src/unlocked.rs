@@ -1,5 +1,8 @@
 use crate::{
-    contents::{key_pair::KeyPair, public_key_info::KeyType, Content, ContentEntity},
+    contents::{
+        key_pair::KeyPair, public_key_info::KeyType, public_key_info::PublicKeyInfo, Content,
+        ContentEntity,
+    },
     locked::LockedWallet,
 };
 use serde::{Deserialize, Serialize};
@@ -65,6 +68,10 @@ impl UnlockedWallet {
         }
     }
 
+    pub fn set_content(&mut self, cref: &str, content: ContentEntity) -> Option<ContentEntity> {
+        self.contents.insert(cref.to_string(), content)
+    }
+
     pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
         let c = self.contents.get(key_ref)?;
         Some(ContentEntity {
@@ -101,6 +108,25 @@ impl UnlockedWallet {
                 ..content_entity.clone()
             })
         })
+    }
+
+    pub fn add_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
+        self.contents.entry(key_ref.to_string()).and_modify(|key| {
+            let oldc = key.content.clone();
+            match oldc {
+                Content::KeyPair(mut kp) => {
+                    kp.public_key.controller.push(controller.to_string());
+                    key.content = Content::KeyPair(kp);
+                }
+                Content::PublicKey(mut pk) => {
+                    pk.controller.push(controller.to_string());
+                    key.content = Content::PublicKey(pk);
+                }
+                _ => {}
+            }
+        });
+
+        Some(())
     }
 
     pub fn get_keys(&self) -> Vec<ContentEntity> {
