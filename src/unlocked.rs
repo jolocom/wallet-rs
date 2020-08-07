@@ -68,6 +68,19 @@ impl UnlockedWallet {
         }
     }
 
+    pub fn import_content(&mut self, content: ContentEntity) -> Option<ContentEntity> {
+        let id = Uuid::new_v4().to_urn().to_string();
+        let with_id = ContentEntity {
+            id: id.clone(),
+            context: vec![
+                "https://transmute-industries.github.io/universal-wallet/contexts/wallet-v1.json"
+                    .to_string(),
+            ],
+            ..content
+        };
+        self.contents.insert(id, with_id)
+    }
+
     pub fn set_content(&mut self, cref: &str, content: ContentEntity) -> Option<ContentEntity> {
         self.contents.insert(cref.to_string(), content)
     }
