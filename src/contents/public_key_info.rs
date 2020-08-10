@@ -1,6 +1,10 @@
+use super::encryption::seal_box;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
-use ursa::{encryption::symm::prelude::*, keys::PublicKey, signatures::prelude::*};
+use ursa::{
+    encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
+    signatures::prelude::*,
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PublicKeyInfo {
@@ -26,13 +30,13 @@ impl PublicKeyInfo {
             ..self
         }
     }
-    pub fn encrypt(&self, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+
+    pub fn encrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, String> {
         match self.key_type {
             // default use xChaCha20Poly1905
-            KeyType::X25519KeyAgreementKey2019 => EncryptorType::XChaCha20Poly1305
-                .gen_encryptor(&self.public_key)
-                .decrypt_easy(aad, data)
-                .map_err(|e| e.to_string()),
+            KeyType::X25519KeyAgreementKey2019 => {
+                seal_box::<X25519Sha256, XChaCha20Poly1305>(data, &self.public_key)
+            }
             _ => Err("wrong key type".to_string()),
         }
     }
