@@ -16,11 +16,11 @@ pub struct PublicKeyInfo {
 }
 
 impl PublicKeyInfo {
-    pub fn new(kt: KeyType, pk: PublicKey) -> Self {
+    pub fn new(kt: KeyType, pk: &[u8]) -> Self {
         Self {
             controller: vec![],
             key_type: kt,
-            public_key: pk,
+            public_key: PublicKey(pk.to_vec()),
         }
     }
 
