@@ -12,6 +12,14 @@ pub struct PublicKeyInfo {
 }
 
 impl PublicKeyInfo {
+    pub fn new(kt: KeyType, pk: PublicKey) -> Self {
+        Self {
+            controller: vec![],
+            key_type: kt,
+            public_key: pk,
+        }
+    }
+
     pub fn controller(self, controller: Vec<String>) -> Self {
         Self {
             controller: controller,
