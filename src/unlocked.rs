@@ -37,6 +37,7 @@ impl UnlockedWallet {
         }
     }
 
+    // TODO provide a closure for transforming the key to a controller value
     pub fn new_key(
         &mut self,
         key_type: KeyType,
@@ -123,16 +124,16 @@ impl UnlockedWallet {
         })
     }
 
-    pub fn add_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
+    pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
         self.contents.entry(key_ref.to_string()).and_modify(|key| {
             let oldc = key.content.clone();
             match oldc {
                 Content::KeyPair(mut kp) => {
-                    kp.public_key.controller.push(controller.to_string());
+                    kp.public_key.controller = vec![controller.to_string()];
                     key.content = Content::KeyPair(kp);
                 }
                 Content::PublicKey(mut pk) => {
-                    pk.controller.push(controller.to_string());
+                    pk.controller = vec![controller.to_string()];
                     key.content = Content::PublicKey(pk);
                 }
                 _ => {}
