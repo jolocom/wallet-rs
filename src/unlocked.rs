@@ -1,6 +1,6 @@
 use crate::{
     contents::{
-        key_pair::KeyPair, public_key_info::KeyType, public_key_info::PublicKeyInfo, Content,
+        key_pair::KeyPair, public_key_info::KeyType, Content,
         ContentEntity,
     },
     locked::LockedWallet,

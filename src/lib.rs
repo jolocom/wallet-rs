@@ -11,7 +11,7 @@ pub fn get_random(len: usize) -> Result<Vec<u8>, String> {
 pub mod prelude {
     pub use crate::contents::{
         key_pair::KeyPair,
-        public_key_info::{KeyType, PublicKeyInfo},
+        public_key_info::{KeyType, PublicKeyInfo, to_recoverable_signature},
         Content, ContentEntity,
     };
     pub use crate::locked::LockedWallet;
@@ -23,34 +23,20 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn it_works() -> Result<(), String> {
+    fn secp256k1_recoverable_round_trip() -> Result<(), String> {
+        let message = "hello".as_bytes();
         let mut w = UnlockedWallet::new("thing");
-        let pk_info = w.new_key(KeyType::Ed25519VerificationKey2018, None)?;
-        let message = "hi there";
-        let sig = w.sign_raw(&pk_info.id, message.as_bytes())?;
+        let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;   
 
-        print!(
-            "\n{}\n",
-            serde_json::to_string(&pk_info).map_err(|e| e.to_string())?
-        );
+        let sig = w.sign_raw(&pk_info.id, &message)?;
 
         assert_eq!(
             Ok(true),
             match pk_info.content {
-                Content::PublicKey(pk) => pk.verify(message.as_bytes(), &sig),
+                Content::PublicKey(r_pk_inf) => r_pk_inf.verify(&message, &sig),
                 _ => Ok(false),
             }
         );
-
-        let lw = w.lock(message.as_bytes())?;
-
-        let uw = lw.unlock(message.as_bytes())?;
-
-        // let sig2 = uw.sign_raw(message.as_bytes(), &kref)?;
-
-        // assert_eq!(Ok(true), w.verify_raw(message.as_bytes(), &kref, &sig));
-        // assert_eq!(Ok(true), uw.verify_raw(message.as_bytes(), &kref, &sig2));
-
         Ok(())
     }
 }

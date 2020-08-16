@@ -1,10 +1,14 @@
 use super::encryption::seal_box;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
+use secp256k1::{Secp256k1, Message, recovery::{RecoverableSignature }};
 use ursa::{
     encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
     signatures::prelude::*,
 };
+
+use crypto::digest::Digest;
+use crypto::sha3::Sha3;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PublicKeyInfo {
@@ -53,6 +57,29 @@ impl PublicKeyInfo {
                 scp.verify(data, signature, &self.public_key)
                     .map_err(|e| e.to_string())
             }
+
+            KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
+                let scp = Secp256k1::new();
+
+                let mut output = [0u8; 32];
+                let mut hasher = Sha3::keccak256();
+                hasher.input(data);
+                hasher.result(&mut output);
+
+                let message = Message::from_slice(&output)
+                    .or_else(|e| return Err(e.to_string()))?;
+
+                let signature = parse_concatenated(&signature)?;
+
+                let signing_key = scp.recover(&message, &signature)
+                    .or_else(|e| return Err(e.to_string()))?;
+
+                let our_key = secp256k1::PublicKey::from_slice(&self.public_key.0)
+                    .or_else(|e| return Err(e.to_string()))?;
+                // println!("{:?}", signing_key);
+                // println!("{:?}", our_key);
+                Ok(signing_key == our_key)
+            }
             _ => Err("wrong key type".to_string()),
         }
     }
@@ -98,4 +125,35 @@ pub enum PublicKeyEncoding {
     PublicKeyBase58(String),
     PublicKeyMultibase(String),
     EthereumAddress(String),
+}
+
+pub fn to_recoverable_signature(
+    v: u8,
+    r: &[u8; 32],
+    s: &[u8; 32],
+) -> Result<secp256k1::recovery::RecoverableSignature, String> {
+    let rec_id = secp256k1::recovery::RecoveryId::from_i32(v as i32)
+        .map_err(|_| "Failed to read the recovery bit")?;
+
+    let mut data = [0u8; 64];
+    data[0..32].copy_from_slice(r);
+    data[32..64].copy_from_slice(s);
+
+    Ok(secp256k1::recovery::RecoverableSignature::from_compact(&data, rec_id).map_err(|_| "Failed to parse signature")?)
+}
+
+pub fn parse_concatenated(signature: &[u8]) -> Result<RecoverableSignature, String> {
+    let mut r = [0u8; 32];
+    let mut s = [0u8; 32];
+    let v = signature[64];
+
+    r.copy_from_slice(&signature[..32]);
+    s.copy_from_slice(&signature[32..64]);
+
+    println!("{:?}", signature);
+    println!("{:?}", r);
+    println!("{:?}", s);
+    println!("{:?}", v);
+
+    to_recoverable_signature(v, &r, &s)
 }
