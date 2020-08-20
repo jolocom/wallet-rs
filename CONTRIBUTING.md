@@ -26,7 +26,7 @@ Otherwise you are an "external contributor" and you must do the following:
 Make sure that every file you modified or created contains a copyright notice comment like the following (at the top of the file):
 
    ```text
-   # Copyright 2014-2020 Jolocom GmbH and Jolocom contributors
+    # Copyright 2014-2020 Jolocom GmbH and Jolocom contributors
     # SPDX-License-Identifier: (Apache-2.0 AND CC-BY-4.0)
     # Code is Apache-2.0 and docs are CC-BY-4.0
    ```
