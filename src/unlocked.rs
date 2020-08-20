@@ -13,6 +13,7 @@ use ursa::{
     hash::{sha3::Sha3_256, Digest},
 };
 use uuid::Uuid;
+use crate::Error;
 
 #[derive(Serialize, Deserialize)]
 pub struct UnlockedWallet {
@@ -42,7 +43,7 @@ impl UnlockedWallet {
         &mut self,
         key_type: KeyType,
         key_controller: Option<Vec<String>>,
-    ) -> Result<ContentEntity, String> {
+    ) -> Result<ContentEntity, Error> {
         let id = Uuid::new_v4().to_urn().to_string();
         let kp = KeyPair::random_pair(key_type)?;
         let pk = kp.public_key.clone();
@@ -65,7 +66,7 @@ impl UnlockedWallet {
         self.contents.insert(id.clone(), pk_info);
         match self.get_key(&id) {
             Some(pk) => Ok(pk),
-            None => Err("Error Inserting Key".to_string()),
+            None => Err(Error::KeyInsertionError),
         }
     }
 
@@ -159,39 +160,41 @@ impl UnlockedWallet {
             .collect()
     }
 
-    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
                 Content::KeyPair(k) => k.sign(data),
-                _ => Err("incorrect content type".to_string()),
+                _ => Err(Error::ContentTypeIncorrect),
             },
-            None => Err("no key found".to_string()),
+            None => Err(Error::KeyNotFound),
         }
     }
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.contents.get(key_ref) {
             Some(c) => match &c.content {
                 Content::KeyPair(k) => k.decrypt(data, aad),
-                _ => Err("incorrect content type".to_string()),
+                _ => Err(Error::ContentTypeIncorrect),
             },
-            None => Err("no key found".to_string()),
+            None => Err(Error::KeyNotFound),
         }
     }
-    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, String> {
+    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
         sha3.input(key);
         let pass = sha3.result();
 
-        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
+        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass)
+            .map_err(|e| Error::AeadCryptoError(e))?;
 
         Ok(LockedWallet {
             id: self.id.clone(),
             ciphertext: aes
                 .encrypt_easy(
                     self.id.as_bytes(),
-                    &to_string(&self).map_err(|e| e.to_string())?.as_bytes(),
+                    &to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
                 )
-                .map_err(|e| e.to_string())?,
+                .map_err(|e| Error::AeadCryptoError(e))?,
         })
     }
+
 }

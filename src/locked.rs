@@ -1,4 +1,5 @@
 use super::unlocked::UnlockedWallet;
+use super::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use ursa::{
@@ -20,17 +21,22 @@ impl LockedWallet {
         }
     }
 
-    pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, String> {
+    pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
         sha3.input(key);
         let pass = sha3.result();
 
-        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
+        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass)
+            .map_err(|e| Error::AeadCryptoError(e))?;
 
         let dec = aes
             .decrypt_easy(self.id.as_bytes(), &self.ciphertext)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| Error::AeadCryptoError(e))?;
 
-        from_str(std::str::from_utf8(&dec).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+        let as_str = std::str::from_utf8(&dec)
+            .map_err(|e| Error::Utf8(e))?;
+
+        from_str(as_str)
+            .map_err(|e| Error::Serde(e))
     }
 }

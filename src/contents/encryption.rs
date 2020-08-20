@@ -6,9 +6,10 @@ use ursa::{
 };
 use xsalsa20poly1305::aead::{
     generic_array::{typenum::U48, GenericArray},
-    Aead, Error, NewAead, Payload,
+    Aead, NewAead, Payload,
 };
 use xsalsa20poly1305::XSalsa20Poly1305 as RXSalsa;
+use crate::Error;
 
 struct XSalsa20Poly1305(RXSalsa);
 
@@ -21,7 +22,7 @@ impl Aead for XSalsa20Poly1305 {
         &self,
         nonce: &GenericArray<u8, Self::NonceSize>,
         plaintext: impl Into<Payload<'msg, 'aad>>,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, aead::Error> {
         self.0.encrypt(nonce, plaintext)
     }
 
@@ -29,7 +30,7 @@ impl Aead for XSalsa20Poly1305 {
         &self,
         nonce: &GenericArray<u8, Self::NonceSize>,
         ciphertext: impl Into<Payload<'msg, 'aad>>,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, aead::Error> {
         self.0.decrypt(nonce, ciphertext)
     }
 }
@@ -49,13 +50,15 @@ impl Encryptor for XSalsa20Poly1305 {
 pub fn make_channel<K: KeyExchangeScheme, E: Encryptor>(
     pk: &PublicKey,
     sk: &PrivateKey,
-) -> Result<SymmetricEncryptor<E>, String> {
+) -> Result<SymmetricEncryptor<E>, Error> {
+    let key = &K::new();
+    let k = key
+        .compute_shared_secret(sk, pk)
+        .map_err(|e| Error::UrsaCryptoError(e))?;
     SymmetricEncryptor::<E>::new_with_key(
-        &K::new()
-            .compute_shared_secret(sk, pk)
-            .map_err(|e| e.to_string())?,
+        k
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| Error::AeadCryptoError(e)) 
 }
 
 pub fn make_box<K: KeyExchangeScheme, E: Encryptor>(
@@ -63,10 +66,10 @@ pub fn make_box<K: KeyExchangeScheme, E: Encryptor>(
     pk: &PublicKey,
     sk: &PrivateKey,
     nonce: &[u8],
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, Error> {
     make_channel::<K, E>(pk, sk)?
         .encrypt(nonce, &[0u8; 0], data)
-        .map_err(|e| e.to_string())
+        .map_err(|e| Error::AeadCryptoError(e))
 }
 
 pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
@@ -74,17 +77,18 @@ pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
     pk: &PublicKey,
     sk: &PrivateKey,
     nonce: &[u8],
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, Error> {
     make_channel::<K, E>(pk, sk)?
         .decrypt(nonce, &[0u8; 0], data)
-        .map_err(|e| e.to_string())
+        .map_err(|e| Error::AeadCryptoError(e))
 }
 
 pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     rk: &PublicKey,
-) -> Result<Vec<u8>, String> {
-    let (epk, esk) = K::new().keypair(None).map_err(|e| e.to_string())?;
+) -> Result<Vec<u8>, Error> {
+    let (epk, esk) = K::new().keypair(None)
+        .map_err(|e| Error::UrsaCryptoError(e))?;
     Ok(epk
         .0
         .iter()
@@ -102,7 +106,7 @@ pub fn unseal_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     rpk: &PublicKey,
     rsk: &PrivateKey,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, Error> {
     let epk = PublicKey(data[..K::public_key_size()].to_vec());
     open_box::<K, E>(
         &data[K::public_key_size()..],
@@ -113,13 +117,13 @@ pub fn unseal_box<K: KeyExchangeScheme, E: Encryptor>(
 }
 
 #[test]
-fn round_trip() -> Result<(), String> {
+fn round_trip() -> Result<(), Error> {
     let akp = X25519Sha256::new()
         .keypair(None)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Error::UrsaCryptoError(e))?;
     let bkp = X25519Sha256::new()
         .keypair(None)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Error::UrsaCryptoError(e))?;
 
     let message = b"hello there";
     let nonce = b"my noncemy noncemy nonce";
@@ -140,7 +144,7 @@ fn round_trip() -> Result<(), String> {
 }
 
 #[test]
-fn test_vector_1() -> Result<(), String> {
+fn test_vector_1() -> Result<(), Error> {
     // corresponding to tests/box.c and tests/box3.cpp from NaCl
     let alicesk = PrivateKey(vec![
         0x77, 0x07, 0x6d, 0x0a, 0x73, 0x18, 0xa5, 0x7d, 0x3c, 0x16, 0xc1, 0x72, 0x51, 0xb2, 0x66,
@@ -184,7 +188,7 @@ fn test_vector_1() -> Result<(), String> {
     Ok(())
 }
 #[test]
-fn test_vector_2() {
+fn test_vector_2() -> Result<(), Error> {
     // corresponding to tests/box2.c and tests/box4.cpp from NaCl
     let bobsk = PrivateKey(vec![
         0x5d, 0xab, 0x08, 0x7e, 0x62, 0x4a, 0x8a, 0x4b, 0x79, 0xe1, 0x7f, 0x8b, 0x83, 0x80, 0x0e,
@@ -212,7 +216,7 @@ fn test_vector_2() {
         0x56, 0x24, 0x4a, 0x9e, 0x88, 0xd5, 0xf9, 0xb3, 0x79, 0x73, 0xf6, 0x22, 0xa4, 0x3d, 0x14,
         0xa6, 0x59, 0x9b, 0x1f, 0x65, 0x4c, 0xb4, 0x5a, 0x74, 0xe3, 0x55, 0xa5,
     ];
-    let mexp = Ok(vec![
+    let mexp:Result<Vec<u8>, Error> = Ok(vec![
         0xbe, 0x07, 0x5f, 0xc5, 0x3c, 0x81, 0xf2, 0xd5, 0xcf, 0x14, 0x13, 0x16, 0xeb, 0xeb, 0x0c,
         0x7b, 0x52, 0x28, 0xc5, 0x2a, 0x4c, 0x62, 0xcb, 0xd4, 0x4b, 0x66, 0x84, 0x9b, 0x64, 0x24,
         0x4f, 0xfc, 0xe5, 0xec, 0xba, 0xaf, 0x33, 0xbd, 0x75, 0x1a, 0x1a, 0xc7, 0x28, 0xd4, 0x5e,
@@ -224,5 +228,6 @@ fn test_vector_2() {
         0xe0, 0x82, 0xf9, 0x37, 0x76, 0x38, 0x48, 0x64, 0x5e, 0x07, 0x05,
     ]);
     let m = open_box::<X25519Sha256, XSalsa20Poly1305>(&c, &alicepk, &bobsk, &nonce);
-    assert!(mexp == m);
+    assert_eq!(mexp?, m?);
+    Ok(())
 }
