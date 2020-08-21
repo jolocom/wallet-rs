@@ -76,8 +76,7 @@ impl PublicKeyInfo {
 
                 let our_key = secp256k1::PublicKey::from_slice(&self.public_key.0)
                     .or_else(|e| return Err(e.to_string()))?;
-                // println!("{:?}", signing_key);
-                // println!("{:?}", our_key);
+
                 Ok(signing_key == our_key)
             }
             _ => Err("wrong key type".to_string()),
