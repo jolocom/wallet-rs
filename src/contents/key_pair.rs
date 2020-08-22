@@ -3,7 +3,7 @@ use super::public_key_info::{KeyType, PublicKeyInfo};
 use serde::{Deserialize, Serialize};
 use secp256k1::{Secp256k1, Message, SecretKey };
 use ursa::{
-    encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::{
+    encryption::symm::prelude::*, kex::x25519::X25519Sha256, kex::KeyExchangeScheme, keys::{
         PrivateKey,
     },
     signatures::prelude::*,
