@@ -21,6 +21,18 @@ pub struct KeyPair {
 impl KeyPair {
     pub fn random_pair(key_type: KeyType) -> Result<KeyPair, String> {
         match key_type {
+            KeyType::X25519KeyAgreementKey2019 => {
+                let x = X25519Sha256::new();
+                let (pk, sk) = x.keypair(None).map_err(|e| e.to_string())?;
+                Ok(KeyPair {
+                    public_key: PublicKeyInfo {
+                        controller: vec![],
+                        key_type: key_type,
+                        public_key: pk,
+                    },
+                    private_key: sk,
+                })
+            }
             KeyType::Ed25519VerificationKey2018 => {
                 let ed = Ed25519Sha512::new();
                 let (pk, sk) = ed.keypair(None).map_err(|e| e.to_string())?;
