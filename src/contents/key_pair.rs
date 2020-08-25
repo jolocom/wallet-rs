@@ -1,21 +1,19 @@
 use super::encryption::unseal_box;
 use super::public_key_info::{KeyType, PublicKeyInfo};
-use serde::{Deserialize, Serialize};
-use secp256k1::{Secp256k1, Message, SecretKey };
-use ursa::{
-    encryption::symm::prelude::*, kex::x25519::X25519Sha256, kex::KeyExchangeScheme, keys::{
-        PrivateKey,
-    },
-    signatures::prelude::*,
-};
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
+use secp256k1::{Message, Secp256k1, SecretKey};
+use serde::{Deserialize, Serialize};
+use ursa::{
+    encryption::symm::prelude::*, kex::x25519::X25519Sha256, kex::KeyExchangeScheme,
+    keys::PrivateKey, signatures::prelude::*,
+};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KeyPair {
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
-    private_key: PrivateKey,
+    pub private_key: PrivateKey,
 }
 
 impl KeyPair {
@@ -90,16 +88,15 @@ impl KeyPair {
             }
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = Secp256k1::new();
-                let secp_secret_key = SecretKey::from_slice(&self.private_key.0)
-                    .map_err(|e| e.to_string())?;
+                let secp_secret_key =
+                    SecretKey::from_slice(&self.private_key.0).map_err(|e| e.to_string())?;
 
                 let mut hasher = Sha3::keccak256();
                 hasher.input(data);
                 let mut output = [0u8; 32];
                 hasher.result(&mut output);
 
-                let message = Message::from_slice(&output)
-                    .map_err(|e| e.to_string())?;
+                let message = Message::from_slice(&output).map_err(|e| e.to_string())?;
 
                 let sig = scp.sign_recoverable(&message, &secp_secret_key);
                 let (rec_id, rs) = sig.serialize_compact();
