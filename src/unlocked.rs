@@ -82,23 +82,13 @@ impl UnlockedWallet {
     }
 
     pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
-        match self.contents.get(key_ref) {
-            Some(c) => match &c.content {
-                Content::KeyPair(k) => k.sign(data),
-                _ => Err("incorrect content type".to_string()),
-            },
-            None => Err("no key found".to_string()),
-        }
+        self.contents.sign_raw(key_ref, data)
     }
+
     pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
-        match self.contents.get(key_ref) {
-            Some(c) => match &c.content {
-                Content::KeyPair(k) => k.decrypt(data, aad),
-                _ => Err("incorrect content type".to_string()),
-            },
-            None => Err("no key found".to_string()),
-        }
+        self.contents.decrypt(key_ref, data, aad)
     }
+
     pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, String> {
         let mut sha3 = Sha3_256::new();
         sha3.input(key);

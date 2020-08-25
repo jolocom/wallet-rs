@@ -35,7 +35,10 @@ fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
                 .to_string(),
         ],
         id: id.to_owned(),
-        content: content.clone(),
+        content: match content {
+            Content::KeyPair(kp) => Content::PublicKey(kp.public_key.clone()),
+            _ => content.clone(),
+        },
     }
 }
 
@@ -127,6 +130,26 @@ impl Contents {
                 ))
             })
             .collect()
+    }
+
+    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+        match self.0.get(key_ref) {
+            Some(c) => match &c {
+                Content::KeyPair(k) => k.sign(data),
+                _ => Err("incorrect content type".to_string()),
+            },
+            None => Err("no key found".to_string()),
+        }
+    }
+
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+        match self.0.get(key_ref) {
+            Some(c) => match &c {
+                Content::KeyPair(k) => k.decrypt(data, aad),
+                _ => Err("incorrect content type".to_string()),
+            },
+            None => Err("no key found".to_string()),
+        }
     }
 }
 

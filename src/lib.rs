@@ -34,7 +34,7 @@ mod tests {
         assert_eq!(
             Ok(true),
             match pk_info.content {
-                Content::KeyPair(r_pk_inf) => r_pk_inf.public_key.verify(&message, &sig),
+                Content::PublicKey(r_pk_inf) => r_pk_inf.verify(&message, &sig),
                 _ => Ok(false),
             }
         );
