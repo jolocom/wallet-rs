@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Entropy {
     #[serde(rename = "type")]
     pub entropy_type: Vec<String>,
@@ -28,8 +28,7 @@ mod serde_base_64 {
             where
                 E: serde::de::Error,
             {
-                base64::decode_config(b64_encoded_str, base64::URL_SAFE)
-                    .map_err(de::Error::custom)
+                base64::decode_config(b64_encoded_str, base64::URL_SAFE).map_err(de::Error::custom)
             }
         }
 
