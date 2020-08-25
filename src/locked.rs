@@ -25,9 +25,10 @@ impl LockedWallet {
         sha3.input(key);
         let pass = sha3.result();
 
-        let aes = SymmetricEncryptor::<Aes256Gcm>::new_with_key(pass).map_err(|e| e.to_string())?;
+        let xChaCha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
+            .map_err(|e| e.to_string())?;
 
-        let dec = aes
+        let dec = xChaCha
             .decrypt_easy(self.id.as_bytes(), &self.ciphertext)
             .map_err(|e| e.to_string())?;
 
