@@ -53,23 +53,35 @@ impl UnlockedWallet {
         }));
         self.contents
             .import(key_pair)
+            .map(|(id, content)| content.to_entity(&id).clean())
             .ok_or("Failed to add Key Pair".to_string())
     }
 
     pub fn import_content(&mut self, content: &Content) -> Option<ContentEntity> {
-        self.contents.import(content.clone())
+        self.contents
+            .import(content.clone())
+            .map(|(id, content)| content.to_entity(&id).clean())
     }
 
     pub fn set_content(&mut self, cref: &str, content: Content) -> Option<ContentEntity> {
-        self.contents.insert(cref, content)
+        self.contents
+            .insert(cref, content)
+            .map(|content| content.to_entity(cref).clean())
     }
 
     pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
-        self.contents.get_key(key_ref)
+        self.contents
+            .get(key_ref)
+            .and_then(|content| match content {
+                Content::Entropy(_) => None,
+                _ => Some(content.to_entity(key_ref).clean()),
+            })
     }
 
     pub fn get_key_by_controller(&self, controller: &str) -> Option<ContentEntity> {
-        self.contents.get_by_controller(controller)
+        self.contents
+            .get_by_controller(controller)
+            .map(|(id, content)| content.to_entity(&id).clean())
     }
 
     pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
@@ -78,15 +90,31 @@ impl UnlockedWallet {
     }
 
     pub fn get_keys(&self) -> Vec<ContentEntity> {
-        self.contents.get_pub_keys()
+        self.contents
+            .get_keys()
+            .iter()
+            .map(|(id, content)| content.to_entity(id).clean())
+            .collect()
     }
 
     pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
-        self.contents.sign_raw(key_ref, data)
+        match self.contents.get(key_ref) {
+            Some(c) => match &c {
+                Content::KeyPair(k) => k.sign(data),
+                _ => Err("incorrect content type".to_string()),
+            },
+            None => Err("no key found".to_string()),
+        }
     }
 
     pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
-        self.contents.decrypt(key_ref, data, aad)
+        match self.contents.get(key_ref) {
+            Some(c) => match &c {
+                Content::KeyPair(k) => k.decrypt(data, aad),
+                _ => Err("incorrect content type".to_string()),
+            },
+            None => Err("no key found".to_string()),
+        }
     }
 
     pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, String> {

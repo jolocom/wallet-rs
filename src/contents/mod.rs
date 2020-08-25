@@ -20,12 +20,28 @@ pub struct ContentEntity {
     pub content: Content,
 }
 
+impl ContentEntity {
+    /// Cleans the entity of any sensative material
+    pub fn clean(self) -> Self {
+        match self.content {
+            Content::KeyPair(kp) => Content::PublicKey(kp.clean()).to_entity(&self.id),
+            _ => self,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Content {
     Entropy(entropy::Entropy),
     KeyPair(key_pair::KeyPair),
     PublicKey(public_key_info::PublicKeyInfo),
+}
+
+impl Content {
+    pub fn to_entity(&self, id: &str) -> ContentEntity {
+        content_to_entity(self, id)
+    }
 }
 
 fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
@@ -35,10 +51,7 @@ fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
                 .to_string(),
         ],
         id: id.to_owned(),
-        content: match content {
-            Content::KeyPair(kp) => Content::PublicKey(kp.public_key.clone()),
-            _ => content.clone(),
-        },
+        content: content.clone(),
     }
 }
 
@@ -50,106 +63,62 @@ impl Contents {
         Self(HashMap::<String, Content>::new())
     }
 
-    pub fn insert(&mut self, id: &str, content: Content) -> Option<ContentEntity> {
+    pub fn insert(&mut self, id: &str, content: Content) -> Option<&Content> {
         self.0.insert(id.to_owned(), content);
         self.get(id)
     }
 
-    pub fn import(&mut self, content: Content) -> Option<ContentEntity> {
-        self.insert(&Uuid::new_v4().to_urn().to_string(), content)
+    pub fn import(&mut self, content: Content) -> Option<(String, &Content)> {
+        let id = Uuid::new_v4().to_urn().to_string();
+        Some((id.clone(), self.insert(&id, content)?))
     }
 
-    pub fn get(&self, id: &str) -> Option<ContentEntity> {
-        self.0.get(id).and_then(|c| Some(content_to_entity(c, id)))
+    pub fn get(&self, id: &str) -> Option<&Content> {
+        self.0.get(id)
     }
 
-    pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
-        let c = self.0.get(key_ref)?;
-        Some(content_to_entity(
-            &match &c {
-                Content::KeyPair(kp) => Content::PublicKey(kp.clean()),
-                Content::PublicKey(pk) => Content::PublicKey(pk.clone()),
-                _ => return None,
-            },
-            key_ref,
-        ))
-    }
-
-    pub fn get_by_controller(&self, controller: &str) -> Option<ContentEntity> {
-        self.0.iter().find_map(|(id, content)| {
-            Some(content_to_entity(
-                &Content::PublicKey(match content {
-                    Content::KeyPair(kp)
-                        if kp.public_key.controller.iter().any(|c| c == controller) =>
-                    {
-                        kp.clean()
-                    }
-                    Content::PublicKey(pk) if pk.controller.iter().any(|c| c == controller) => {
-                        pk.clone()
-                    }
-                    _ => return None,
-                }),
-                id,
-            ))
+    pub fn get_by_controller(&self, controller: &str) -> Option<(String, &Content)> {
+        self.0.iter().find_map(|(id, content)| match content {
+            Content::PublicKey(pk) if pk.controller.iter().any(|c| c == controller) => {
+                Some((id.to_string(), content))
+            }
+            Content::KeyPair(kp) if kp.public_key.controller.iter().any(|c| c == controller) => {
+                Some((id.to_string(), content))
+            }
+            _ => None,
         })
     }
 
-    pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<ContentEntity> {
-        let oldk = self.get(key_ref)?;
+    pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<&Content> {
+        let oldk = self.0.remove(key_ref)?;
         self.insert(
             key_ref,
-            match oldk.content {
+            match oldk {
                 Content::PublicKey(pk) => Content::PublicKey(PublicKeyInfo {
                     controller: vec![controller.to_string()],
-                    ..pk
+                    ..pk.clone()
                 }),
                 Content::KeyPair(kp) => Content::KeyPair(KeyPair {
                     public_key: PublicKeyInfo {
                         controller: vec![controller.to_string()],
-                        ..kp.public_key
+                        ..kp.public_key.clone()
                     },
-                    ..kp
+                    ..kp.clone()
                 }),
-                _ => oldk.content,
+                _ => oldk,
             },
         );
-        self.get_key(key_ref)
+        self.0.get(key_ref)
     }
 
-    pub fn get_pub_keys(&self) -> Vec<ContentEntity> {
+    pub fn get_keys(&self) -> Vec<(String, &Content)> {
         self.0
             .iter()
-            .filter_map(|(id, content)| {
-                Some(content_to_entity(
-                    &Content::PublicKey(match &content {
-                        Content::KeyPair(kp) => kp.clean(),
-                        Content::PublicKey(pk) => pk.clone(),
-                        _ => return None,
-                    }),
-                    id,
-                ))
+            .filter_map(|(id, content)| match content {
+                Content::Entropy(_) => None,
+                _ => Some((id.to_string(), content)),
             })
             .collect()
-    }
-
-    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
-        match self.0.get(key_ref) {
-            Some(c) => match &c {
-                Content::KeyPair(k) => k.sign(data),
-                _ => Err("incorrect content type".to_string()),
-            },
-            None => Err("no key found".to_string()),
-        }
-    }
-
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
-        match self.0.get(key_ref) {
-            Some(c) => match &c {
-                Content::KeyPair(k) => k.decrypt(data, aad),
-                _ => Err("incorrect content type".to_string()),
-            },
-            None => Err("no key found".to_string()),
-        }
     }
 }
 
