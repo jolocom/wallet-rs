@@ -24,7 +24,7 @@ impl KeyPair {
             KeyType::Ed25519VerificationKey2018 => Ed25519Sha512::expand_keypair(&priv_key)
                 .map_err(|e| e.to_string())?,
 
-            KeyType::EcdsaSecp256k1VerificationKey2019 => EcdsaSecp256k1Sha256::new().keypair(
+            KeyType::EcdsaSecp256k1VerificationKey2019 | KeyType::EcdsaSecp256k1RecoveryMethod2020 => EcdsaSecp256k1Sha256::new().keypair(
                 Some(KeyGenOption::FromSecretKey(PrivateKey(priv_key.clone()))))
                 .map_err(|e| e.to_string())?,
             _ => return Err("key type unsupported".to_string())
