@@ -2,11 +2,13 @@ use super::encryption::unseal_box;
 use super::public_key_info::{KeyType, PublicKeyInfo};
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
-use secp256k1::{Message, Secp256k1, SecretKey};
+use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use ursa::{
-    encryption::symm::prelude::*, kex::x25519::X25519Sha256, kex::KeyExchangeScheme,
-    keys::PrivateKey, signatures::prelude::*,
+    encryption::symm::prelude::*, kex::x25519::X25519Sha256, kex::KeyExchangeScheme, keys::{
+        PrivateKey
+    },
+    signatures::prelude::*,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -17,6 +19,25 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
+    pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<KeyPair, String> {
+        match key_type {
+            KeyType::Ed25519VerificationKey2018 => {
+                let (pk, sk) = Ed25519Sha512::expand_keypair(&priv_key)
+                    .map_err(|e| e.to_string())?;
+
+                Ok(KeyPair {
+                    public_key: PublicKeyInfo {
+                        controller: vec![],
+                        key_type: key_type,
+                        public_key: pk,
+                    },
+                    private_key: sk
+                })
+            }
+            _ => Err("key type unsupported".to_string()),
+        }
+    }
+
     pub fn random_pair(key_type: KeyType) -> Result<KeyPair, String> {
         match key_type {
             KeyType::X25519KeyAgreementKey2019 => {
@@ -88,8 +109,9 @@ impl KeyPair {
             }
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = Secp256k1::new();
-                let secp_secret_key =
-                    SecretKey::from_slice(&self.private_key.0).map_err(|e| e.to_string())?;
+
+                let secp_secret_key = secp256k1::SecretKey::from_slice(&self.private_key.0)
+                    .map_err(|e| e.to_string())?;
 
                 let mut hasher = Sha3::keccak256();
                 hasher.input(data);
@@ -138,4 +160,19 @@ pub enum PrivateKeyEncoding {
     PrivateKeyWebKms(String),
     PrivateKeySecureEnclave(String),
     PrivateKeyFromSeed { path: String, seed_ref: String },
+}
+
+
+#[test]
+fn key_pair_new_ed25519 () {
+    // Test vector from https://fossies.org/linux/tor/src/test/ed25519_vectors.inc
+    let test_sk = hex::decode("26c76712d89d906e6672dafa614c42e5cb1caac8c6568e4d2493087db51f0d36").unwrap();
+    let expected_pk = hex::decode("c2247870536a192d142d056abefca68d6193158e7c1a59c1654c954eccaff894").unwrap();
+
+    let key_entry = KeyPair::new(KeyType::Ed25519VerificationKey2018, &test_sk).unwrap();
+
+    assert!(key_entry.public_key.key_type == KeyType::Ed25519VerificationKey2018);
+    assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
+    assert_eq!(key_entry.public_key.public_key.0, expected_pk);
+    assert_eq!(key_entry.private_key.0, [&test_sk[..], &expected_pk[..]].concat())
 }

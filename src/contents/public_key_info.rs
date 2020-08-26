@@ -85,7 +85,7 @@ impl PublicKeyInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum KeyType {
     JwsVerificationKey2020,
     EcdsaSecp256k1VerificationKey2019,
