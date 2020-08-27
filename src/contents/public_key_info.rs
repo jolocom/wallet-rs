@@ -6,9 +6,7 @@ use ursa::{
     encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
     signatures::prelude::*,
 };
-
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
+use sha3::{Digest, Keccak256};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKeyInfo {
@@ -61,10 +59,10 @@ impl PublicKeyInfo {
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = Secp256k1::new();
 
-                let mut output = [0u8; 32];
-                let mut hasher = Sha3::keccak256();
-                hasher.input(data);
-                hasher.result(&mut output);
+                let mut hasher = Keccak256::new();
+                hasher.update(data);
+
+                let output = hasher.finalize();
 
                 let message =
                     Message::from_slice(&output).or_else(|e| return Err(e.to_string()))?;

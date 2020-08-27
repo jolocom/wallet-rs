@@ -1,7 +1,5 @@
 use super::encryption::unseal_box;
 use super::public_key_info::{KeyType, PublicKeyInfo};
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
 use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use ursa::{
@@ -11,6 +9,7 @@ use ursa::{
     keys::{KeyGenOption, PrivateKey},
     signatures::prelude::*,
 };
+use sha3::{Digest, Keccak256};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KeyPair {
@@ -98,10 +97,9 @@ impl KeyPair {
                 let secp_secret_key = secp256k1::SecretKey::from_slice(&self.private_key.0)
                     .map_err(|e| e.to_string())?;
 
-                let mut hasher = Sha3::keccak256();
-                hasher.input(data);
-                let mut output = [0u8; 32];
-                hasher.result(&mut output);
+                let mut hasher = Keccak256::new();
+                hasher.update(data);
+                let output = hasher.finalize();
 
                 let message = Message::from_slice(&output).map_err(|e| e.to_string())?;
 
@@ -164,6 +162,15 @@ fn key_pair_new_ed25519() {
         key_entry.private_key.0,
         [&test_sk[..], &expected_pk[..]].concat()
     )
+}
+
+#[test]
+fn keccak256_correct_output() {
+    let input = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    let mut hasher = Keccak256::new();
+    hasher.update(input.as_bytes());
+    let output = hasher.finalize();
+    assert_eq!(hex::encode(output), "45d3b367a6904e6e8d502ee04999a7c27647f91fa845d456525fd352ae3d7371");
 }
 
 #[test]
