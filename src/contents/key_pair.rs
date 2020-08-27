@@ -31,7 +31,7 @@ impl KeyPair {
                     priv_key.clone(),
                 ))))
                 .map_err(|e| e.to_string())?,
-            KeyType::X25519KeyAgreementKey2019 => Ed25519Sha512::new()
+            KeyType::X25519KeyAgreementKey2019 => X25519Sha256::new()
                 .keypair(Some(KeyGenOption::FromSecretKey(PrivateKey(
                     priv_key.clone(),
                 ))))
