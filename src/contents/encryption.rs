@@ -58,6 +58,9 @@ pub fn make_channel<K: KeyExchangeScheme, E: Encryptor>(
     .map_err(|e| e.to_string())
 }
 
+/// Make Box
+///
+/// Creates an authcrypted sealed box construction, generic over key agreement method and asym encryptor
 pub fn make_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     pk: &PublicKey,
@@ -69,6 +72,9 @@ pub fn make_box<K: KeyExchangeScheme, E: Encryptor>(
         .map_err(|e| e.to_string())
 }
 
+/// Open Box
+///
+/// Creates an authcrypted secret box construction, generic over key agreement method and asym encryptor
 pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     pk: &PublicKey,
@@ -80,6 +86,10 @@ pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
         .map_err(|e| e.to_string())
 }
 
+/// Seal Box
+///
+/// Creates an anoncrypted secret box construction, generic over key agreement method and asym encryptor
+/// uses the
 pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     rk: &PublicKey,
@@ -98,6 +108,9 @@ pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
         .collect())
 }
 
+/// Unseal Box
+///
+/// Opens an anoncrypted box construction, generic over key agreement method and asym encryptor
 pub fn unseal_box<K: KeyExchangeScheme, E: Encryptor>(
     data: &[u8],
     rpk: &PublicKey,
