@@ -1,7 +1,7 @@
 use ursa::{
     encryption::symm::prelude::*,
     hash::{blake2::Blake2, Digest},
-    kex::{x25519::X25519Sha256, KeyExchangeScheme},
+    kex::KeyExchangeScheme,
     keys::{PrivateKey, PublicKey},
 };
 use xsalsa20poly1305::aead::{
@@ -95,17 +95,16 @@ pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
     rk: &PublicKey,
 ) -> Result<Vec<u8>, String> {
     let (epk, esk) = K::new().keypair(None).map_err(|e| e.to_string())?;
-    Ok(epk
-        .0
-        .iter()
-        .chain(&make_box::<K, E>(
+    Ok([
+        epk.0.clone(),
+        make_box::<K, E>(
             data,
             rk,
             &esk,
             &Blake2::new().chain(&epk).chain(&rk).result()[..24],
-        )?)
-        .cloned()
-        .collect())
+        )?,
+    ]
+    .concat())
 }
 
 /// Unseal Box
@@ -116,17 +115,36 @@ pub fn unseal_box<K: KeyExchangeScheme, E: Encryptor>(
     rpk: &PublicKey,
     rsk: &PrivateKey,
 ) -> Result<Vec<u8>, String> {
-    let epk = PublicKey(data[..K::public_key_size()].to_vec());
-    open_box::<K, E>(
-        &data[K::public_key_size()..],
-        &epk,
-        rsk,
-        &Blake2::new().chain(&epk).chain(&rpk).result()[..24],
-    )
+    if data.len() < K::public_key_size() {
+        Err("Box too small".into())
+    } else {
+        let epk = PublicKey(data[..K::public_key_size()].to_vec());
+        open_box::<K, E>(
+            &data[K::public_key_size()..],
+            &epk,
+            rsk,
+            &Blake2::new().chain(&epk).chain(&rpk).result()[..24],
+        )
+    }
+}
+
+#[test]
+fn too_short() -> Result<(), String> {
+    use ursa::kex::x25519::X25519Sha256;
+    let akp = X25519Sha256::new()
+        .keypair(None)
+        .map_err(|e| e.to_string())?;
+
+    let message = b"bla";
+
+    assert!(!unseal_box::<X25519Sha256, XSalsa20Poly1305>(&message[..], &akp.0, &akp.1).is_ok());
+
+    Ok(())
 }
 
 #[test]
 fn round_trip() -> Result<(), String> {
+    use ursa::kex::x25519::X25519Sha256;
     let akp = X25519Sha256::new()
         .keypair(None)
         .map_err(|e| e.to_string())?;
@@ -154,6 +172,7 @@ fn round_trip() -> Result<(), String> {
 
 #[test]
 fn test_vector_1() -> Result<(), String> {
+    use ursa::kex::x25519::X25519Sha256;
     // corresponding to tests/box.c and tests/box3.cpp from NaCl
     let alicesk = PrivateKey(vec![
         0x77, 0x07, 0x6d, 0x0a, 0x73, 0x18, 0xa5, 0x7d, 0x3c, 0x16, 0xc1, 0x72, 0x51, 0xb2, 0x66,
@@ -198,6 +217,7 @@ fn test_vector_1() -> Result<(), String> {
 }
 #[test]
 fn test_vector_2() {
+    use ursa::kex::x25519::X25519Sha256;
     // corresponding to tests/box2.c and tests/box4.cpp from NaCl
     let bobsk = PrivateKey(vec![
         0x5d, 0xab, 0x08, 0x7e, 0x62, 0x4a, 0x8a, 0x4b, 0x79, 0xe1, 0x7f, 0x8b, 0x83, 0x80, 0x0e,
