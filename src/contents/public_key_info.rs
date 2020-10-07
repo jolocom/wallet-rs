@@ -8,6 +8,8 @@ use ursa::{
 };
 use sha3::{Digest, Keccak256};
 
+use crate::Error;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKeyInfo {
     pub controller: Vec<String>,
@@ -33,27 +35,27 @@ impl PublicKeyInfo {
         }
     }
 
-    pub fn encrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn encrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
                 seal_box::<X25519Sha256, XChaCha20Poly1305>(data, &self.public_key)
             }
-            _ => Err("wrong key type".to_string()),
+            _ => Err(Error::WrongKeyType),
         }
     }
 
-    pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, String> {
+    pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
         match self.key_type {
             KeyType::Ed25519VerificationKey2018 => {
                 let ed = Ed25519Sha512::new();
                 ed.verify(data, signature, &self.public_key)
-                    .map_err(|e| e.to_string())
+                    .map_err(|e| Error::UrsaCryptoError(e))
             }
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
                 let scp = EcdsaSecp256k1Sha256::new();
                 scp.verify(data, signature, &self.public_key)
-                    .map_err(|e| e.to_string())
+                    .map_err(|e| Error::UrsaCryptoError(e))
             }
 
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
@@ -65,20 +67,20 @@ impl PublicKeyInfo {
                 let output = hasher.finalize();
 
                 let message =
-                    Message::from_slice(&output).or_else(|e| return Err(e.to_string()))?;
+                    Message::from_slice(&output).map_err(|e| Error::Other(Box::new(e)))?;
 
                 let signature = parse_concatenated(&signature)?;
 
                 let signing_key = scp
                     .recover(&message, &signature)
-                    .or_else(|e| return Err(e.to_string()))?;
+                    .map_err(|e| Error::SecpCryptoError(e))?;
 
                 let our_key = secp256k1::PublicKey::from_slice(&self.public_key.0)
-                    .or_else(|e| return Err(e.to_string()))?;
+                    .map_err(|e| Error::SecpCryptoError(e))?;
 
                 Ok(signing_key == our_key)
             }
-            _ => Err("wrong key type".to_string()),
+            _ => Err(Error::WrongKeyType),
         }
     }
 }
@@ -129,21 +131,19 @@ pub fn to_recoverable_signature(
     v: u8,
     r: &[u8; 32],
     s: &[u8; 32],
-) -> Result<secp256k1::recovery::RecoverableSignature, String> {
+) -> Result<secp256k1::recovery::RecoverableSignature, Error> {
     let rec_id = secp256k1::recovery::RecoveryId::from_i32(v as i32)
-        .map_err(|_| "Failed to read the recovery bit")?;
+        .map_err(|e| Error::SecpCryptoError(e))?;
 
     let mut data = [0u8; 64];
     data[0..32].copy_from_slice(r);
     data[32..64].copy_from_slice(s);
 
-    Ok(
-        secp256k1::recovery::RecoverableSignature::from_compact(&data, rec_id)
-            .map_err(|_| "Failed to parse signature")?,
-    )
+    Ok(secp256k1::recovery::RecoverableSignature::from_compact(&data, rec_id)
+        .map_err(|e| Error::SecpCryptoError(e))?)
 }
 
-pub fn parse_concatenated(signature: &[u8]) -> Result<RecoverableSignature, String> {
+pub fn parse_concatenated(signature: &[u8]) -> Result<RecoverableSignature, Error> {
     let mut r = [0u8; 32];
     let mut s = [0u8; 32];
     let v = signature[64];
