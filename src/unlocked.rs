@@ -1,6 +1,7 @@
 use crate::{
     contents::{key_pair::KeyPair, public_key_info::KeyType, Content, ContentEntity, Contents},
     locked::LockedWallet,
+    Error,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -39,8 +40,9 @@ impl UnlockedWallet {
         &mut self,
         key_type: KeyType,
         key_controller: Option<Vec<String>>,
-    ) -> Result<ContentEntity, String> {
-        let kp = KeyPair::random_pair(key_type)?;
+    ) -> Result<ContentEntity, Error> {
+        let kp = KeyPair::random_pair(key_type)
+            .map_err(|e| Error::Other(Box::new(e)))?;
         let pk = kp.public_key.clone();
         let key_pair = Content::KeyPair(kp.controller(match key_controller {
             Some(c) => c,
@@ -50,11 +52,11 @@ impl UnlockedWallet {
                     ]
                     .join("#")
                     .to_string()],
-        }));
+                }));
         self.contents
             .import(key_pair)
             .map(|(id, content)| content.to_entity(&id).clean())
-            .ok_or("Failed to add Key Pair".to_string())
+            .ok_or(Error::KeyPairAddFailed)
     }
 
     pub fn import_content(&mut self, content: &Content) -> Option<ContentEntity> {
@@ -97,42 +99,43 @@ impl UnlockedWallet {
             .collect()
     }
 
-    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.sign(data),
-                _ => Err("incorrect content type".to_string()),
+                _ => Err(Error::ContentTypeIncorrect),
             },
-            None => Err("no key found".to_string()),
+            None => Err(Error::KeyNotFound),
         }
     }
 
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.decrypt(data, aad),
-                _ => Err("incorrect content type".to_string()),
+                _ => Err(Error::ContentTypeIncorrect),
             },
-            None => Err("no key found".to_string()),
+            None => Err(Error::KeyNotFound),
         }
     }
 
-    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, String> {
+    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
         sha3.input(key);
         let pass = sha3.result();
 
-        let xChaCha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
-            .map_err(|e| e.to_string())?;
+        let x_cha_cha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
+            .map_err(|e| Error::AeadCryptoError(e))?;
 
         Ok(LockedWallet {
             id: self.id.clone(),
-            ciphertext: xChaCha
+            ciphertext: x_cha_cha
                 .encrypt_easy(
                     self.id.as_bytes(),
-                    &to_string(&self).map_err(|e| e.to_string())?.as_bytes(),
+                    &to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
                 )
-                .map_err(|e| e.to_string())?,
+                .map_err(|e| Error::AeadCryptoError(e))?,
         })
     }
+
 }

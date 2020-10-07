@@ -1,6 +1,6 @@
 use super::encryption::unseal_box;
 use super::public_key_info::{KeyType, PublicKeyInfo};
-use secp256k1::{Message, Secp256k1};
+use secp256k1::{Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
 use ursa::{
     encryption::symm::prelude::*,
@@ -9,6 +9,7 @@ use ursa::{
     keys::{KeyGenOption, PrivateKey},
     signatures::prelude::*,
 };
+use crate::Error;
 use sha3::{Digest, Keccak256};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -19,23 +20,23 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
-    pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<KeyPair, String> {
+    pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<KeyPair, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                Ed25519Sha512::expand_keypair(&priv_key).map_err(|e| e.to_string())?
+                Ed25519Sha512::expand_keypair(&priv_key).map_err(|e| Error::UrsaCryptoError(e))?
             }
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => EcdsaSecp256k1Sha256::new()
                 .keypair(Some(KeyGenOption::FromSecretKey(PrivateKey(
                     priv_key.clone(),
                 ))))
-                .map_err(|e| e.to_string())?,
+                .map_err(|e| Error::UrsaCryptoError(e))?,
             KeyType::X25519KeyAgreementKey2019 => X25519Sha256::new()
                 .keypair(Some(KeyGenOption::FromSecretKey(PrivateKey(
                     priv_key.clone(),
                 ))))
-                .map_err(|e| e.to_string())?,
-            _ => return Err("key type unsupported".to_string()),
+                .map_err(|e| Error::UrsaCryptoError(e))?,
+            _ => return Err(Error::UnsupportedKeyType),
         };
 
         Ok(KeyPair {
@@ -48,22 +49,22 @@ impl KeyPair {
         })
     }
 
-    pub fn random_pair(key_type: KeyType) -> Result<KeyPair, String> {
+    pub fn random_pair(key_type: KeyType) -> Result<KeyPair, Error> {
         let (pk, sk) = match key_type {
             KeyType::X25519KeyAgreementKey2019 => {
                 let x = X25519Sha256::new();
-                x.keypair(None).map_err(|e| e.to_string())?
+                x.keypair(None).map_err(|e| Error::UrsaCryptoError(e))?
             }
             KeyType::Ed25519VerificationKey2018 => {
                 let ed = Ed25519Sha512::new();
-                ed.keypair(None).map_err(|e| e.to_string())?
+                ed.keypair(None).map_err(|e| Error::UrsaCryptoError(e))?
             }
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = EcdsaSecp256k1Sha256::new();
-                scp.keypair(None).map_err(|e| e.to_string())?
+                scp.keypair(None).map_err(|e| Error::UrsaCryptoError(e))?
             }
-            _ => return Err("key type unsupported".to_string()),
+            _ => return Err(Error::UnsupportedKeyType),
         };
 
         Ok(KeyPair {
@@ -81,27 +82,29 @@ impl KeyPair {
             ..self
         }
     }
-    pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             KeyType::Ed25519VerificationKey2018 => {
                 let ed = Ed25519Sha512::new();
-                ed.sign(data, &self.private_key).map_err(|e| e.to_string())
+                ed.sign(data, &self.private_key)
+                    .map_err(|e| Error::UrsaCryptoError(e))
             }
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
                 let scp = EcdsaSecp256k1Sha256::new();
-                scp.sign(data, &self.private_key).map_err(|e| e.to_string())
+                scp.sign(data, &self.private_key)
+                    .map_err(|e| Error::UrsaCryptoError(e))
             }
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = Secp256k1::new();
-
-                let secp_secret_key = secp256k1::SecretKey::from_slice(&self.private_key.0)
-                    .map_err(|e| e.to_string())?;
+                let secp_secret_key = SecretKey::from_slice(&self.private_key.0)
+                    .map_err(|e| Error::SecpCryptoError(e))?;
 
                 let mut hasher = Keccak256::new();
                 hasher.update(data);
                 let output = hasher.finalize();
 
-                let message = Message::from_slice(&output).map_err(|e| e.to_string())?;
+                let message = Message::from_slice(&output)
+                    .map_err(|e| Error::SecpCryptoError(e))?;
 
                 let sig = scp.sign_recoverable(&message, &secp_secret_key);
                 let (rec_id, rs) = sig.serialize_compact();
@@ -113,10 +116,10 @@ impl KeyPair {
 
                 Ok(ret)
             }
-            _ => Err("wrong key type".to_string()),
+            _ => Err(Error::WrongKeyType),
         }
     }
-    pub fn decrypt(&self, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             // default use xChaCha20Poly1905 with x25519 key agreement
             KeyType::X25519KeyAgreementKey2019 => unseal_box::<X25519Sha256, XChaCha20Poly1305>(
@@ -124,7 +127,7 @@ impl KeyPair {
                 &self.public_key.public_key,
                 &self.private_key,
             ),
-            _ => Err("wrong key type".to_string()),
+            _ => Err(Error::WrongKeyType),
         }
     }
     pub fn clean(&self) -> PublicKeyInfo {
@@ -189,7 +192,7 @@ fn key_pair_new_ecdsa_secp256k1() {
     assert_eq!(key_entry.public_key.public_key.0, expected_pk);
 }
 
-#[test] // TODO Finalize
+#[test]
 fn key_pair_new_ecdsa_x25519() {
     // Test vector from https://tools.ietf.org/html/rfc7748#section-6.1
     let test_sk =
@@ -197,10 +200,11 @@ fn key_pair_new_ecdsa_x25519() {
     let expected_pk =
         hex::decode("e3712d851a0e5d79b831c5e34ab22b41a198171de209b8b8faca23a11c624859").unwrap();
 
-    let key_entry = KeyPair::new(KeyType::X25519KeyAgreementKey2019, &test_sk).unwrap();
+    let key_entry = KeyPair::new(KeyType::X25519KeyAgreementKey2019, &test_sk)?;
 
     assert!(key_entry.public_key.key_type == KeyType::X25519KeyAgreementKey2019);
     assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
     assert_eq!(key_entry.private_key.0, test_sk);
     assert_eq!(key_entry.public_key.public_key.0, expected_pk);
+    Ok(())
 }
