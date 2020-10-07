@@ -1,10 +1,10 @@
 extern crate aead;
+extern crate thiserror;
 
 pub mod contents;
 pub mod locked;
 pub mod unlocked;
 
-use thiserror::Error as ThisError;
 use ursa::encryption::random_vec;
 
 pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -14,7 +14,7 @@ pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 pub mod prelude {
     pub use crate::contents::{
         key_pair::KeyPair,
-        public_key_info::{KeyType, PublicKeyInfo, to_recoverable_signature},
+        public_key_info::{to_recoverable_signature, KeyType, PublicKeyInfo},
         Content, ContentEntity,
     };
     pub use crate::locked::LockedWallet;
@@ -22,7 +22,7 @@ pub mod prelude {
 }
 
 /// Wrapper enum for proper error handling
-#[derive(Debug, ThisError)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Indicates error during key insertion
     #[error("error inserting key")]
@@ -39,6 +39,13 @@ pub enum Error {
     /// Content type is incorrect in current context
     #[error("incorrect content type")]
     ContentTypeIncorrect,
+    /// Internal encryption errors
+    #[error("Box is to small")]
+    BoxToSmall,
+    #[error("failed to add Key Pair")]
+    KeyPairAddFailed,
+    /// External encryption errors
+    ///
     /// Opaque errors wrapper for aead crate
     #[error("cryptography failure in aead: {0}")]
     AeadCryptoError(aead::Error),
@@ -70,7 +77,7 @@ mod tests {
     fn secp256k1_recoverable_round_trip() -> Result<(), Error> {
         let message = "hello".as_bytes();
         let mut w = UnlockedWallet::new("thing");
-        let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;   
+        let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
 
         let sig = w.sign_raw(&pk_info.id, &message)?;
 
@@ -80,6 +87,25 @@ mod tests {
                 _ => false,
             }
         );
+        Ok(())
+    }
+
+    #[test]
+    fn wallet() -> Result<(), Error> {
+        let mut w = UnlockedWallet::new("thing");
+        w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
+        w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
+        w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
+        w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
+        w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
+        let pass = "My Password".to_string();
+
+        let lw = w.lock(pass.as_bytes())?;
+
+        let uw = lw.unlock(pass.as_bytes())?;
+
+        assert_eq!(5, uw.get_keys().len());
+
         Ok(())
     }
 }

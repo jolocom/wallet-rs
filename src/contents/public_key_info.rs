@@ -1,17 +1,16 @@
 use super::encryption::seal_box;
 use core::str::FromStr;
+use secp256k1::{recovery::RecoverableSignature, Message, Secp256k1};
 use serde::{Deserialize, Serialize};
-use secp256k1::{Secp256k1, Message, recovery::{RecoverableSignature }};
 use ursa::{
     encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
     signatures::prelude::*,
 };
+use sha3::{Digest, Keccak256};
 
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
 use crate::Error;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKeyInfo {
     pub controller: Vec<String>,
     #[serde(rename = "type")]
@@ -62,23 +61,23 @@ impl PublicKeyInfo {
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let scp = Secp256k1::new();
 
-                let mut output = [0u8; 32];
-                let mut hasher = Sha3::keccak256();
-                hasher.input(data);
-                hasher.result(&mut output);
+                let mut hasher = Keccak256::new();
+                hasher.update(data);
 
-                let message = Message::from_slice(&output)
-                    .or_else(|e| return Err(Error::SecpCryptoError(e)))?;
+                let output = hasher.finalize();
+
+                let message =
+                    Message::from_slice(&output).map_err(|e| Error::Other(Box::new(e)))?;
 
                 let signature = parse_concatenated(&signature)?;
 
-                let signing_key = scp.recover(&message, &signature)
-                    .or_else(|e| return Err(Error::SecpCryptoError(e)))?;
+                let signing_key = scp
+                    .recover(&message, &signature)
+                    .map_err(|e| Error::SecpCryptoError(e))?;
 
                 let our_key = secp256k1::PublicKey::from_slice(&self.public_key.0)
-                    .or_else(|e| return Err(Error::SecpCryptoError(e)))?;
-                // println!("{:?}", signing_key);
-                // println!("{:?}", our_key);
+                    .map_err(|e| Error::SecpCryptoError(e))?;
+
                 Ok(signing_key == our_key)
             }
             _ => Err(Error::WrongKeyType),
@@ -86,7 +85,7 @@ impl PublicKeyInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum KeyType {
     JwsVerificationKey2020,
     EcdsaSecp256k1VerificationKey2019,

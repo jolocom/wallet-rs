@@ -1,8 +1,10 @@
 [package]
-name = "wallet_rs"
-version = "0.1.0"
+name = "universal_wallet"
+version = "0.2.2"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>"]
 edition = "2018"
+description = "Rust implementation of the Universal Wallet 2020 Specification"
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,7 +15,7 @@ hex = { version = "0.4.2", features = ["serde"]}
 thiserror = "1.0"
 secp256k1 = { version = "0.17.2", features = ["recovery"]}
 ursa = { version = "0.3.4", default-features = false, features = ["portable"]}
-rust-crypto = "0.2.36"
+sha3 = "0.9.1"
 xsalsa20poly1305 = "0.4"
 bs58 = "0.3"
 base64 = "0.12"
