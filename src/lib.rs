@@ -5,11 +5,9 @@ pub mod contents;
 pub mod locked;
 pub mod unlocked;
 
-use ursa::encryption::random_vec;
-
-pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Ok(random_vec(len).map_err(|e| Error::AeadCryptoError(e))?)
-}
+// pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+//     Ok(random_vec(len).map_err(|e| Error::AeadCryptoError(e))?)
+// }
 
 pub mod prelude {
     pub use crate::contents::{
@@ -49,9 +47,10 @@ pub enum Error {
     /// Opaque errors wrapper for aead crate
     #[error("cryptography failure in aead: {0}")]
     AeadCryptoError(aead::Error),
-    /// Opaque errors wrapper for ursa crate
-    #[error("cryptography failure in ursa: {0}")]
-    UrsaCryptoError(ursa::CryptoError),
+    //TODO: Remove after URSA decoupling
+    // /// Opaque errors wrapper for ursa crate
+    // #[error("cryptography failure in ursa: {0}")]
+    // UrsaCryptoError(ursa::CryptoError),
     /// Opaque errors wrapper for secp256k1 crate
     #[error("cryptography failure in secp256k1: {0}")]
     SecpCryptoError(secp256k1::Error),
