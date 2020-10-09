@@ -5,10 +5,16 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use ursa::{
-    encryption::symm::prelude::*,
-    hash::{sha3::Sha3_256, Digest},
+use sha3::Sha3_256;
+use chacha20poly1305::{
+    ChaCha20Poly1305,
+    aead::NewAead,
 };
+//TODO:: URSA cleanup
+// use ursa::{
+//     encryption::symm::prelude::*,
+//     hash::{sha3::Sha3_256, Digest},
+// };
 
 #[derive(Serialize, Deserialize)]
 pub struct UnlockedWallet {
@@ -124,8 +130,7 @@ impl UnlockedWallet {
         sha3.input(key);
         let pass = sha3.result();
 
-        let x_cha_cha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
-            .map_err(|e| Error::AeadCryptoError(e))?;
+        let x_cha_cha = ChaCha20Poly1305::new(key);
 
         Ok(LockedWallet {
             id: self.id.clone(),

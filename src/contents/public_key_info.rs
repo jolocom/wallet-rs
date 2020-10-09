@@ -2,12 +2,19 @@ use super::encryption::seal_box;
 use core::str::FromStr;
 use secp256k1::{recovery::RecoverableSignature, Message, Secp256k1};
 use serde::{Deserialize, Serialize};
-use ursa::{
-    encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
-    signatures::prelude::*,
+use chacha20poly1305::{
+    XChaCha20Poly1305,
 };
+use x25519_dalek::{
+    PublicKey,
+    X25519_BASEPOINT_BYTES,
+};
+//TODO: URSA decoupling cleanup
+// use ursa::{
+//     encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
+//     signatures::prelude::*,
+// };
 use sha3::{Digest, Keccak256};
-
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -24,7 +31,7 @@ impl PublicKeyInfo {
         Self {
             controller: vec![],
             key_type: kt,
-            public_key: PublicKey(pk.to_vec()),
+            public_key: PublicKey::new(pk.to_vec()),
         }
     }
 
@@ -39,7 +46,8 @@ impl PublicKeyInfo {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
-                seal_box::<X25519Sha256, XChaCha20Poly1305>(data, &self.public_key)
+                // is this really what we want? 
+                seal_box::<X25519_BASEPOINT_BYTES, XChaCha20Poly1305>(data, &self.public_key)
             }
             _ => Err(Error::WrongKeyType),
         }

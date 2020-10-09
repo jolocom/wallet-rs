@@ -2,10 +2,16 @@ use super::unlocked::UnlockedWallet;
 use super::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
-use ursa::{
-    encryption::symm::prelude::*,
-    hash::{sha3::Sha3_256, Digest},
+use sha3::Sha3_256;
+use chacha20poly1305::{
+    ChaCha20Poly1305,
+    aead::NewAead,
 };
+//TODO:ursa decoupling cleanup
+// use ursa::{
+//     encryption::symm::prelude::*,
+//     hash::{sha3::Sha3_256, Digest},
+// };
 
 #[derive(Serialize, Deserialize)]
 pub struct LockedWallet {
@@ -26,9 +32,8 @@ impl LockedWallet {
         sha3.input(key);
         let pass = sha3.result();
 
-        let x_cha_cha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
-            .map_err(|e| Error::AeadCryptoError(e))?;
-
+        let x_cha_cha = ChaCha20Poly1305::new(key);
+        
         let dec = x_cha_cha
             .decrypt_easy(self.id.as_bytes(), &self.ciphertext)
             .map_err(|e| Error::AeadCryptoError(e))?;

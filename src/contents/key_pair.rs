@@ -2,13 +2,23 @@ use super::encryption::unseal_box;
 use super::public_key_info::{KeyType, PublicKeyInfo};
 use secp256k1::{Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
-use ursa::{
-    encryption::symm::prelude::*,
-    kex::x25519::X25519Sha256,
-    kex::KeyExchangeScheme,
-    keys::{KeyGenOption, PrivateKey},
-    signatures::prelude::*,
+use chacha20poly1305::{
+    XChaCha20Poly1305,
 };
+use x25519_dalek::{
+    x25519,
+    PublicKey,
+    X25519_BASEPOINT_BYTES,
+    StaticSecret,
+};
+//TODO: URSA decoupling cleanup
+// use ursa::{
+//     encryption::symm::prelude::*,
+//     kex::x25519::X25519Sha256,
+//     kex::KeyExchangeScheme,
+//     keys::{KeyGenOption, PrivateKey},
+//     signatures::prelude::*,
+// };
 use crate::Error;
 use sha3::{Digest, Keccak256};
 
@@ -16,14 +26,16 @@ use sha3::{Digest, Keccak256};
 pub struct KeyPair {
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
-    pub private_key: PrivateKey,
+    pub private_key: StaticSecret,//PrivateKey,
 }
 
 impl KeyPair {
     pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<KeyPair, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                Ed25519Sha512::expand_keypair(&priv_key).map_err(|e| Error::UrsaCryptoError(e))?
+                // Is this correct?
+                (PublicKey::from(priv_key), StaticSecret::from(priv_key))
+                // Ed25519Sha512::expand_keypair(&priv_key).map_err(|e| Error::UrsaCryptoError(e))?
             }
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => EcdsaSecp256k1Sha256::new()
@@ -85,9 +97,11 @@ impl KeyPair {
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                let ed = Ed25519Sha512::new();
-                ed.sign(data, &self.private_key)
-                    .map_err(|e| Error::UrsaCryptoError(e))
+                x25519(data, &self.private_key)
+                //TODO: URSA desection cleanup
+                // let ed = Ed25519Sha512::new();
+                // ed.sign(data, &self.private_key)
+                //     .map_err(|e| Error::UrsaCryptoError(e))
             }
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
                 let scp = EcdsaSecp256k1Sha256::new();
@@ -122,7 +136,7 @@ impl KeyPair {
     pub fn decrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             // default use xChaCha20Poly1905 with x25519 key agreement
-            KeyType::X25519KeyAgreementKey2019 => unseal_box::<X25519Sha256, XChaCha20Poly1305>(
+            KeyType::X25519KeyAgreementKey2019 => unseal_box::<X25519_BASEPOINT_BYTES, XChaCha20Poly1305>(
                 data,
                 &self.public_key.public_key,
                 &self.private_key,
