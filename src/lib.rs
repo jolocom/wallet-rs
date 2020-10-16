@@ -1,4 +1,6 @@
 extern crate aead;
+extern crate ecdsa;
+extern crate ed25519_dalek;
 extern crate thiserror;
 
 pub mod contents;
@@ -52,8 +54,6 @@ pub enum Error {
     // #[error("cryptography failure in ursa: {0}")]
     // UrsaCryptoError(ursa::CryptoError),
     /// Opaque errors wrapper for secp256k1 crate
-    #[error("cryptography failure in secp256k1: {0}")]
-    SecpCryptoError(secp256k1::Error),
     /// #Transparent errors
     ///
     /// Serde crate errors

@@ -1,94 +1,108 @@
-use ursa::{
-    encryption::symm::prelude::*,
-    hash::{blake2::Blake2, Digest},
-    kex::KeyExchangeScheme,
-    keys::{PrivateKey, PublicKey},
-};
-use xsalsa20poly1305::aead::{
-    generic_array::{
-        typenum::U48,
-        GenericArray,
+//TODO: URSA decoupling cleanup
+// use ursa::{
+//     encryption::symm::prelude::*,
+//     hash::{blake2::Blake2, Digest},
+//     kex::KeyExchangeScheme,
+//     keys::{PrivateKey, PublicKey},
+// };
+// use xsalsa20poly1305::aead::{
+//     generic_array::{
+//         typenum::U48,
+//         GenericArray,
+//     },
+//     Aead, NewAead, Payload,
+// };
+// use xsalsa20poly1305::XSalsa20Poly1305 as RXSalsa;
+use chacha20poly1305::{
+    Key,
+    Nonce,
+    ChaCha20Poly1305,
+    aead::{
+        Aead, 
+        NewAead,
+        Payload,
+        generic_array::GenericArray,
     },
-    Aead, NewAead, Payload,
 };
-use xsalsa20poly1305::XSalsa20Poly1305 as RXSalsa;
+use blake2::{
+    Blake2b,
+    Blake2s, 
+    Digest,
+};
 use crate::Error;
 
-struct XSalsa20Poly1305(RXSalsa);
+// struct Enigma(ChaCha20Poly1305);
 
-impl Aead for XSalsa20Poly1305 {
-    type CiphertextOverhead = <RXSalsa as Aead>::CiphertextOverhead;
-    type NonceSize = <RXSalsa as Aead>::NonceSize;
-    type TagSize = <RXSalsa as Aead>::TagSize;
+// impl Aead for Enigma {
+//     type CiphertextOverhead = <ChaCha20Poly1305 as Aead>::CiphertextOverhead;
+//     type NonceSize = <ChaCha20Poly1305 as Aead>::NonceSize;
+//     type TagSize = <ChaCha20Poly1305 as Aead>::TagSize;
 
-    fn encrypt<'msg, 'aad>(
-        &self,
-        nonce: &GenericArray<u8, Self::NonceSize>,
-        plaintext: impl Into<Payload<'msg, 'aad>>,
-    ) -> Result<Vec<u8>, aead::Error> {
-        self.0.encrypt(nonce, plaintext)
-    }
+//     fn encrypt<'msg, 'aad>(
+//         &self,
+//         nonce: &GenericArray<u8, Self::NonceSize>,
+//         plaintext: impl Into<Payload<'msg, 'aad>>,
+//     ) -> Result<Vec<u8>, aead::Error> {
+//         self.0.encrypt(nonce, plaintext)
+//     }
 
-    fn decrypt<'msg, 'aad>(
-        &self,
-        nonce: &GenericArray<u8, Self::NonceSize>,
-        ciphertext: impl Into<Payload<'msg, 'aad>>,
-    ) -> Result<Vec<u8>, aead::Error> {
-        self.0.decrypt(nonce, ciphertext)
-    }
-}
+//     fn decrypt<'msg, 'aad>(
+//         &self,
+//         nonce: &GenericArray<u8, Self::NonceSize>,
+//         ciphertext: impl Into<Payload<'msg, 'aad>>,
+//     ) -> Result<Vec<u8>, aead::Error> {
+//         self.0.decrypt(nonce, ciphertext)
+//     }
+// }
 
-impl NewAead for XSalsa20Poly1305 {
-    type KeySize = <RXSalsa as NewAead>::KeySize;
+// impl NewAead for Enigma {
+//     type KeySize = <ChaCha20Poly1305 as NewAead>::KeySize;
 
-    fn new(key: &GenericArray<u8, Self::KeySize>) -> Self {
-        Self(RXSalsa::new(key))
-    }
-}
+//     fn new(key: &GenericArray<u8, Self::KeySize>) -> Self {
+//         Self(ChaCha20Poly1305::new(key))
+//     }
+// }
 
-impl Encryptor for XSalsa20Poly1305 {
-    type MinSize = U48;
-}
-
-pub fn make_channel<K: KeyExchangeScheme, E: Encryptor>(
-    pk: &PublicKey,
-    sk: &PrivateKey,
-) -> Result<SymmetricEncryptor<E>, Error> {
-    let key = &K::new();
-    let k = key
-        .compute_shared_secret(sk, pk)
-        .map_err(|e| Error::UrsaCryptoError(e))?;
-    SymmetricEncryptor::<E>::new_with_key(
-        k
-    )
-    .map_err(|e| Error::AeadCryptoError(e)) 
+pub fn make_channel(
+    pk: &Key,
+    sk: &Key,
+) -> Result<ChaCha20Poly1305, Error> {
+    Ok(ChaCha20Poly1305::new(sk))
+    // let key = &K::new();
+    // let k = key
+    //     .compute_shared_secret(sk, pk)
+    //     .map_err(|e| Error::UrsaCryptoError(e))?;
+    // SymmetricEncryptor::<E>::new_with_key(
+    //     k
+    // )
+    // .map_err(|e| Error::AeadCryptoError(e)) 
 }
 
 /// Make Box
 ///
 /// Creates an authcrypted sealed box construction, generic over key agreement method and asym encryptor
-pub fn make_box<K: KeyExchangeScheme, E: Encryptor>(
+pub fn make_box(
     data: &[u8],
-    pk: &PublicKey,
-    sk: &PrivateKey,
+    pk: &Key,
+    sk: &Key,
     nonce: &[u8],
 ) -> Result<Vec<u8>, Error> {
-    make_channel::<K, E>(pk, sk)?
-        .encrypt(nonce, &[0u8; 0], data)
+    make_channel(pk, sk)?
+        .encrypt(GenericArray::from_slice(nonce), data)
         .map_err(|e| Error::AeadCryptoError(e))
 }
 
 /// Open Box
 ///
 /// Creates an authcrypted secret box construction, generic over key agreement method and asym encryptor
-pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
+pub fn open_box(
     data: &[u8],
-    pk: &PublicKey,
-    sk: &PrivateKey,
+    pk: &Key,
+    sk: &Key,
     nonce: &[u8],
 ) -> Result<Vec<u8>, Error> {
-    make_channel::<K, E>(pk, sk)?
-        .decrypt(nonce, &[0u8; 0], data)
+    make_channel(pk, sk)?
+        .decrypt(GenericArray::from_slice(nonce),  data)
         .map_err(|e| Error::AeadCryptoError(e))
 }
 
@@ -96,19 +110,19 @@ pub fn open_box<K: KeyExchangeScheme, E: Encryptor>(
 ///
 /// Creates an anoncrypted secret box construction, generic over key agreement method and asym encryptor
 /// uses the
-pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
+pub fn seal_box(
     data: &[u8],
-    rk: &PublicKey,
+    rk: &Key,
 ) -> Result<Vec<u8>, Error> {
     let (epk, esk) = K::new().keypair(None)
         .map_err(|e| Error::UrsaCryptoError(e))?;
     Ok([
         epk.0.clone(),
-        make_box::<K, E>(
+        make_box(
             data,
             rk,
             &esk,
-            &Blake2::new().chain(&epk).chain(&rk).result()[..24],
+            &Blake2b::new().chain(&epk).chain(&rk).finalize()[..24],
         )?,
     ]
     .concat())
@@ -117,20 +131,21 @@ pub fn seal_box<K: KeyExchangeScheme, E: Encryptor>(
 /// Unseal Box
 ///
 /// Opens an anoncrypted box construction, generic over key agreement method and asym encryptor
-pub fn unseal_box<K: KeyExchangeScheme, E: Encryptor>(
+pub fn unseal_box(
     data: &[u8],
-    rpk: &PublicKey,
-    rsk: &PrivateKey,
+    rpk: &Key,
+    rsk: &Key,
 ) -> Result<Vec<u8>, Error> {
-    if data.len() < K::public_key_size() {
+    let key_size = std::mem::size_of_val(rpk);
+    if data.len() < key_size {
         Err(Error::BoxToSmall)
     } else {
-        let epk = PublicKey(data[..K::public_key_size()].to_vec());
-        open_box::<K, E>(
-            &data[K::public_key_size()..],
+        let epk = Key::from_slice(&data[..key_size]);
+        open_box(
+            &data[key_size..],
             &epk,
             rsk,
-            &Blake2::new().chain(&epk).chain(&rpk).result()[..24],
+            &Blake2b::new().chain(&epk).chain(&rpk).finalize()[..24],
         )
     }
 }
@@ -144,7 +159,7 @@ fn too_short() -> Result<(), Error> {
 
     let message = b"bla";
 
-    assert!(!unseal_box::<X25519Sha256, XSalsa20Poly1305>(&message[..], &akp.0, &akp.1).is_ok());
+    assert!(!unseal_box::<X25519Sha256, Enigma>(&message[..], &akp.0, &akp.1).is_ok());
 
     Ok(())
 }
@@ -162,15 +177,15 @@ fn round_trip() -> Result<(), Error> {
     let message = b"hello there";
     let nonce = b"my noncemy noncemy nonce";
 
-    let aboxb = make_box::<X25519Sha256, XSalsa20Poly1305>(message, &bkp.0, &akp.1, nonce)?;
+    let aboxb = make_box::<X25519Sha256, Enigma>(message, &bkp.0, &akp.1, nonce)?;
 
-    let unlocked = open_box::<X25519Sha256, XSalsa20Poly1305>(&aboxb, &akp.0, &bkp.1, nonce)?;
+    let unlocked = open_box::<X25519Sha256, Enigma>(&aboxb, &akp.0, &bkp.1, nonce)?;
 
     assert_eq!(unlocked, message);
 
-    let bsealeda = seal_box::<X25519Sha256, XSalsa20Poly1305>(message, &akp.0)?;
+    let bsealeda = seal_box::<X25519Sha256, Enigma>(message, &akp.0)?;
 
-    let unsealed = unseal_box::<X25519Sha256, XSalsa20Poly1305>(&bsealeda, &akp.0, &akp.1)?;
+    let unsealed = unseal_box::<X25519Sha256, Enigma>(&bsealeda, &akp.0, &akp.1)?;
 
     assert_eq!(unsealed, message);
 
@@ -206,7 +221,7 @@ fn test_vector_1() -> Result<(), Error> {
         0x24, 0xca, 0x1c, 0x60, 0x90, 0x2e, 0x52, 0xf0, 0xa0, 0x89, 0xbc, 0x76, 0x89, 0x70, 0x40,
         0xe0, 0x82, 0xf9, 0x37, 0x76, 0x38, 0x48, 0x64, 0x5e, 0x07, 0x05,
     ];
-    let c = make_box::<X25519Sha256, XSalsa20Poly1305>(&m, &bobpk, &alicesk, &nonce)?;
+    let c = make_box::<X25519Sha256, Enigma>(&m, &bobpk, &alicesk, &nonce)?;
     let cexp = vec![
         0xf3, 0xff, 0xc7, 0x70, 0x3f, 0x94, 0x00, 0xe5, 0x2a, 0x7d, 0xfb, 0x4b, 0x3d, 0x33, 0x05,
         0xd9, 0x8e, 0x99, 0x3b, 0x9f, 0x48, 0x68, 0x12, 0x73, 0xc2, 0x96, 0x50, 0xba, 0x32, 0xfc,
@@ -263,7 +278,7 @@ fn test_vector_2() -> Result<(), Error> {
         0x24, 0xca, 0x1c, 0x60, 0x90, 0x2e, 0x52, 0xf0, 0xa0, 0x89, 0xbc, 0x76, 0x89, 0x70, 0x40,
         0xe0, 0x82, 0xf9, 0x37, 0x76, 0x38, 0x48, 0x64, 0x5e, 0x07, 0x05,
     ]);
-    let m = open_box::<X25519Sha256, XSalsa20Poly1305>(&c, &alicepk, &bobsk, &nonce);
+    let m = open_box::<X25519Sha256, Enigma>(&c, &alicepk, &bobsk, &nonce);
     assert_eq!(mexp?, m?);
     Ok(())
 }

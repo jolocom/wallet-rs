@@ -10,18 +10,28 @@ license = "Apache-2.0"
 
 [dependencies]
 thiserror = "1.0"
+rand_core = "0.5.1"
 # Serialize/Deserialize
 serde = "1.0"
 serde_json = "1.0"
+# Signing crates
+#secp256k1 = { version = "0.19.0", features = ["recovery", "ecdsa", "sha256"]}
+ecdsa = { version = "0.8.5", features = ["zeroize"] }
+k256 = { version = "0.5.9", features = ["ecdsa", "sha256", "keccak256"]}
+ed25519-dalek = "1.0.1"
 # Encryption crates
 aead = "0.3.2"
-secp256k1 = { version = "0.17.2", features = ["recovery"]}
+### for x86/x86_64 CPUs use flags: RUSTFLAGS="-Ctarget-feature=+avx2"
+### idealy use haswell or skylake as baseline: RUSTFLAGS="-Ctarget-cpu=haswell -Ctarget-feature=+avx2"
 chacha20poly1305 = "0.6.0"
-xsalsa20poly1305 = "0.4"
 x25519-dalek = "1.1.0"
+# To be removed
+#xsalsa20poly1305 = "0.4"
+#ursa = "0.3.5"
 # Hashing crates
 uuid = { version = "0.8", features = ["v4"] }
 sha3 = "0.9.1"
+blake2 = "0.9.0"
 # Encode/Decode
 hex = { version = "0.4.2", features = ["serde"]}
 base64 = "0.12"
