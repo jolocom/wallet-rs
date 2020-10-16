@@ -3,18 +3,20 @@ use crate::{
     locked::LockedWallet,
     Error,
 };
+use generic_array::GenericArray;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use sha3::Sha3_256;
+use sha3::{
+    Digest,
+    Sha3_256
+};
 use chacha20poly1305::{
     ChaCha20Poly1305,
-    aead::NewAead,
+    aead::{
+        Aead,
+        NewAead,
+    },
 };
-//TODO:: URSA cleanup
-// use ursa::{
-//     encryption::symm::prelude::*,
-//     hash::{sha3::Sha3_256, Digest},
-// };
 
 #[derive(Serialize, Deserialize)]
 pub struct UnlockedWallet {
@@ -127,17 +129,17 @@ impl UnlockedWallet {
 
     pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
-        sha3.input(key);
-        let pass = sha3.result();
+        sha3.update(key);
+        let pass = sha3.finalize();
 
-        let x_cha_cha = ChaCha20Poly1305::new(key);
+        let cha_cha = ChaCha20Poly1305::new(GenericArray::from_slice(key));
 
         Ok(LockedWallet {
             id: self.id.clone(),
-            ciphertext: x_cha_cha
-                .encrypt_easy(
-                    self.id.as_bytes(),
-                    &to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
+            ciphertext: cha_cha
+                .encrypt(
+                    GenericArray::from_slice(self.id.as_bytes()),
+                    to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
                 )
                 .map_err(|e| Error::AeadCryptoError(e))?,
         })

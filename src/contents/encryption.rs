@@ -1,191 +1,124 @@
-//TODO: URSA decoupling cleanup
-// use ursa::{
-//     encryption::symm::prelude::*,
-//     hash::{blake2::Blake2, Digest},
-//     kex::KeyExchangeScheme,
-//     keys::{PrivateKey, PublicKey},
-// };
-// use xsalsa20poly1305::aead::{
-//     generic_array::{
-//         typenum::U48,
-//         GenericArray,
-//     },
-//     Aead, NewAead, Payload,
-// };
-// use xsalsa20poly1305::XSalsa20Poly1305 as RXSalsa;
-use chacha20poly1305::{
-    Key,
-    Nonce,
-    ChaCha20Poly1305,
-    aead::{
-        Aead, 
-        NewAead,
-        Payload,
-        generic_array::GenericArray,
-    },
+use crypto_box::{
+    PublicKey, 
+    Box,
+    SecretKey,
+    aead::Aead,
 };
-use blake2::{
-    Blake2b,
-    Blake2s, 
-    Digest,
-};
+use generic_array::GenericArray;
+use rand_core::OsRng;
 use crate::Error;
-
-// struct Enigma(ChaCha20Poly1305);
-
-// impl Aead for Enigma {
-//     type CiphertextOverhead = <ChaCha20Poly1305 as Aead>::CiphertextOverhead;
-//     type NonceSize = <ChaCha20Poly1305 as Aead>::NonceSize;
-//     type TagSize = <ChaCha20Poly1305 as Aead>::TagSize;
-
-//     fn encrypt<'msg, 'aad>(
-//         &self,
-//         nonce: &GenericArray<u8, Self::NonceSize>,
-//         plaintext: impl Into<Payload<'msg, 'aad>>,
-//     ) -> Result<Vec<u8>, aead::Error> {
-//         self.0.encrypt(nonce, plaintext)
-//     }
-
-//     fn decrypt<'msg, 'aad>(
-//         &self,
-//         nonce: &GenericArray<u8, Self::NonceSize>,
-//         ciphertext: impl Into<Payload<'msg, 'aad>>,
-//     ) -> Result<Vec<u8>, aead::Error> {
-//         self.0.decrypt(nonce, ciphertext)
-//     }
-// }
-
-// impl NewAead for Enigma {
-//     type KeySize = <ChaCha20Poly1305 as NewAead>::KeySize;
-
-//     fn new(key: &GenericArray<u8, Self::KeySize>) -> Self {
-//         Self(ChaCha20Poly1305::new(key))
-//     }
-// }
+use blake2::{Blake2b, Digest};
+use std::convert::TryInto;
 
 pub fn make_channel(
-    pk: &Key,
-    sk: &Key,
-) -> Result<ChaCha20Poly1305, Error> {
-    Ok(ChaCha20Poly1305::new(sk))
-    // let key = &K::new();
-    // let k = key
-    //     .compute_shared_secret(sk, pk)
-    //     .map_err(|e| Error::UrsaCryptoError(e))?;
-    // SymmetricEncryptor::<E>::new_with_key(
-    //     k
-    // )
-    // .map_err(|e| Error::AeadCryptoError(e)) 
+    their_public: &PublicKey,
+    our_secret: &SecretKey,
+) -> Box {
+        Box::new(their_public, our_secret)
 }
-
 /// Make Box
 ///
-/// Creates an authcrypted sealed box construction, generic over key agreement method and asym encryptor
+/// Creates an authcrypted sealed box construction using XSalsa20Poly1305 and X25519
 pub fn make_box(
     data: &[u8],
-    pk: &Key,
-    sk: &Key,
+    public_key: &PublicKey,
+    secret_key: &SecretKey,
     nonce: &[u8],
 ) -> Result<Vec<u8>, Error> {
-    make_channel(pk, sk)?
+    make_channel(public_key, secret_key)
         .encrypt(GenericArray::from_slice(nonce), data)
         .map_err(|e| Error::AeadCryptoError(e))
 }
-
-/// Open Box
-///
-/// Creates an authcrypted secret box construction, generic over key agreement method and asym encryptor
-pub fn open_box(
-    data: &[u8],
-    pk: &Key,
-    sk: &Key,
-    nonce: &[u8],
-) -> Result<Vec<u8>, Error> {
-    make_channel(pk, sk)?
-        .decrypt(GenericArray::from_slice(nonce),  data)
-        .map_err(|e| Error::AeadCryptoError(e))
-}
-
 /// Seal Box
 ///
 /// Creates an anoncrypted secret box construction, generic over key agreement method and asym encryptor
 /// uses the
 pub fn seal_box(
     data: &[u8],
-    rk: &Key,
+    rk: &PublicKey,
 ) -> Result<Vec<u8>, Error> {
-    let (epk, esk) = K::new().keypair(None)
-        .map_err(|e| Error::UrsaCryptoError(e))?;
+    let sk = SecretKey::generate(&mut OsRng);
+    let pk = PublicKey::from(&sk);
+    
+    //  let c = ChaCha20Poly1305::new(&GenericArray::from(shared_secret.as_bytes()));
+    let nonce = &Blake2b::new().chain(&pk.as_bytes()).chain(&rk.as_bytes()).finalize()[..24];
+    let b = make_box(data, rk, &sk, nonce)?;
     Ok([
-        epk.0.clone(),
-        make_box(
-            data,
-            rk,
-            &esk,
-            &Blake2b::new().chain(&epk).chain(&rk).finalize()[..24],
-        )?,
+        pk.as_bytes().to_vec(),
+        b,
     ]
     .concat())
 }
 
+pub fn open_box(
+    data: &[u8],
+    pk: &PublicKey,
+    sk: &SecretKey,
+    nonce: &[u8],
+) -> Result<Vec<u8>, Error> {
+    make_channel(pk, sk)
+        .decrypt(GenericArray::from_slice(nonce), data)
+        .map_err(|e| Error::AeadCryptoError(e))
+}
+
 /// Unseal Box
 ///
-/// Opens an anoncrypted box construction, generic over key agreement method and asym encryptor
+/// Opens an anoncrypted box 
+/// NOTE: key length is 32 bytes, hence the magic numbers
 pub fn unseal_box(
     data: &[u8],
-    rpk: &Key,
-    rsk: &Key,
+    rsk: &SecretKey,
 ) -> Result<Vec<u8>, Error> {
-    let key_size = std::mem::size_of_val(rpk);
-    if data.len() < key_size {
+    if data.len() < KeySize {
         Err(Error::BoxToSmall)
     } else {
-        let epk = Key::from_slice(&data[..key_size]);
+        let pk_slice: [u8; KeySize] = data[..KeySize].try_into().map_err(|_| Error::BoxToSmall)?; 
+        let epk = PublicKey::from(pk_slice);
+        let rpk = PublicKey::from(rsk);
         open_box(
-            &data[key_size..],
+            &data[KeySize..],
             &epk,
             rsk,
-            &Blake2b::new().chain(&epk).chain(&rpk).finalize()[..24],
+            &Blake2b::new().chain(&epk.as_bytes()).chain(&rpk.as_bytes()).finalize()[..24],
         )
     }
 }
 
+const KeySize: usize = 32;
+
 #[test]
 fn too_short() -> Result<(), Error> {
-    use ursa::kex::x25519::X25519Sha256;
-    let akp = X25519Sha256::new()
-        .keypair(None)
-        .map_err(|e| Error::UrsaCryptoError(e))?;
+    let sk = SecretKey::generate(&mut OsRng);
+    let pk = PublicKey::from(&sk);
 
     let message = b"bla";
 
-    assert!(!unseal_box::<X25519Sha256, Enigma>(&message[..], &akp.0, &akp.1).is_ok());
+    assert!(!unseal_box(&message[..], &sk).is_ok());
 
     Ok(())
 }
 
 #[test]
 fn round_trip() -> Result<(), Error> {
-    use ursa::kex::x25519::X25519Sha256;
-    let akp = X25519Sha256::new()
-        .keypair(None)
-        .map_err(|e| Error::UrsaCryptoError(e))?;
-    let bkp = X25519Sha256::new()
-        .keypair(None)
-        .map_err(|e| Error::UrsaCryptoError(e))?;
+    //
+    let ask = SecretKey::generate(&mut OsRng);
+    let akp = (PublicKey::from(&ask), ask);
+
+    let sk = SecretKey::generate(&mut OsRng);
+    let bkp = (PublicKey::from(&sk), sk);
 
     let message = b"hello there";
     let nonce = b"my noncemy noncemy nonce";
 
-    let aboxb = make_box::<X25519Sha256, Enigma>(message, &bkp.0, &akp.1, nonce)?;
+    let aboxb = make_box(message, &bkp.0, &akp.1, nonce)?;
 
-    let unlocked = open_box::<X25519Sha256, Enigma>(&aboxb, &akp.0, &bkp.1, nonce)?;
+    let unlocked = open_box(&aboxb, &akp.0, &bkp.1, nonce)?;
 
     assert_eq!(unlocked, message);
 
-    let bsealeda = seal_box::<X25519Sha256, Enigma>(message, &akp.0)?;
+    let bsealeda = seal_box(message, &akp.0)?;
 
-    let unsealed = unseal_box::<X25519Sha256, Enigma>(&bsealeda, &akp.0, &akp.1)?;
+    let unsealed = unseal_box(&bsealeda, &akp.1)?;
 
     assert_eq!(unsealed, message);
 
@@ -194,14 +127,13 @@ fn round_trip() -> Result<(), Error> {
 
 #[test]
 fn test_vector_1() -> Result<(), Error> {
-    use ursa::kex::x25519::X25519Sha256;
     // corresponding to tests/box.c and tests/box3.cpp from NaCl
-    let alicesk = PrivateKey(vec![
+    let alicesk = SecretKey::from([
         0x77, 0x07, 0x6d, 0x0a, 0x73, 0x18, 0xa5, 0x7d, 0x3c, 0x16, 0xc1, 0x72, 0x51, 0xb2, 0x66,
         0x45, 0xdf, 0x4c, 0x2f, 0x87, 0xeb, 0xc0, 0x99, 0x2a, 0xb1, 0x77, 0xfb, 0xa5, 0x1d, 0xb9,
         0x2c, 0x2a,
     ]);
-    let bobpk = PublicKey(vec![
+    let bobpk = PublicKey::from([
         0xde, 0x9e, 0xdb, 0x7d, 0x7b, 0x7d, 0xc1, 0xb4, 0xd3, 0x5b, 0x61, 0xc2, 0xec, 0xe4, 0x35,
         0x37, 0x3f, 0x83, 0x43, 0xc8, 0x5b, 0x78, 0x67, 0x4d, 0xad, 0xfc, 0x7e, 0x14, 0x6f, 0x88,
         0x2b, 0x4f,
@@ -221,7 +153,7 @@ fn test_vector_1() -> Result<(), Error> {
         0x24, 0xca, 0x1c, 0x60, 0x90, 0x2e, 0x52, 0xf0, 0xa0, 0x89, 0xbc, 0x76, 0x89, 0x70, 0x40,
         0xe0, 0x82, 0xf9, 0x37, 0x76, 0x38, 0x48, 0x64, 0x5e, 0x07, 0x05,
     ];
-    let c = make_box::<X25519Sha256, Enigma>(&m, &bobpk, &alicesk, &nonce)?;
+    let c = make_box(&m, &bobpk, &alicesk, &nonce)?;
     let cexp = vec![
         0xf3, 0xff, 0xc7, 0x70, 0x3f, 0x94, 0x00, 0xe5, 0x2a, 0x7d, 0xfb, 0x4b, 0x3d, 0x33, 0x05,
         0xd9, 0x8e, 0x99, 0x3b, 0x9f, 0x48, 0x68, 0x12, 0x73, 0xc2, 0x96, 0x50, 0xba, 0x32, 0xfc,
@@ -239,14 +171,13 @@ fn test_vector_1() -> Result<(), Error> {
 }
 #[test]
 fn test_vector_2() -> Result<(), Error> {
-    use ursa::kex::x25519::X25519Sha256;
     // corresponding to tests/box2.c and tests/box4.cpp from NaCl
-    let bobsk = PrivateKey(vec![
+    let bobsk = SecretKey::from([
         0x5d, 0xab, 0x08, 0x7e, 0x62, 0x4a, 0x8a, 0x4b, 0x79, 0xe1, 0x7f, 0x8b, 0x83, 0x80, 0x0e,
         0xe6, 0x6f, 0x3b, 0xb1, 0x29, 0x26, 0x18, 0xb6, 0xfd, 0x1c, 0x2f, 0x8b, 0x27, 0xff, 0x88,
         0xe0, 0xeb,
     ]);
-    let alicepk = PublicKey(vec![
+    let alicepk = PublicKey::from([
         0x85, 0x20, 0xf0, 0x09, 0x89, 0x30, 0xa7, 0x54, 0x74, 0x8b, 0x7d, 0xdc, 0xb4, 0x3e, 0xf7,
         0x5a, 0x0d, 0xbf, 0x3a, 0x0d, 0x26, 0x38, 0x1a, 0xf4, 0xeb, 0xa4, 0xa9, 0x8e, 0xaa, 0x9b,
         0x4e, 0x6a,
@@ -278,7 +209,7 @@ fn test_vector_2() -> Result<(), Error> {
         0x24, 0xca, 0x1c, 0x60, 0x90, 0x2e, 0x52, 0xf0, 0xa0, 0x89, 0xbc, 0x76, 0x89, 0x70, 0x40,
         0xe0, 0x82, 0xf9, 0x37, 0x76, 0x38, 0x48, 0x64, 0x5e, 0x07, 0x05,
     ]);
-    let m = open_box::<X25519Sha256, Enigma>(&c, &alicepk, &bobsk, &nonce);
+    let m = open_box(&c, &alicepk, &bobsk, &nonce);
     assert_eq!(mexp?, m?);
     Ok(())
 }

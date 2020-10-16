@@ -51,7 +51,7 @@ impl PublicKeyInfo {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
                 // is this really what we want? 
-                seal_box::<X25519_BASEPOINT_BYTES, ChaCha20Poly1305>(data, &self.public_key)
+                seal_box(data, &crypto_box::PublicKey::from(self.public_key.as_slice()))
             }
             _ => Err(Error::WrongKeyType),
         }

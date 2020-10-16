@@ -1,15 +1,12 @@
 extern crate aead;
 extern crate ecdsa;
 extern crate ed25519_dalek;
+extern crate chacha20poly1305;
 extern crate thiserror;
 
 pub mod contents;
 pub mod locked;
 pub mod unlocked;
-
-// pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-//     Ok(random_vec(len).map_err(|e| Error::AeadCryptoError(e))?)
-// }
 
 pub mod prelude {
     pub use crate::contents::{
