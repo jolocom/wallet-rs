@@ -84,7 +84,7 @@ pub fn unseal_box(
     }
 }
 
-const KeySize: usize = 32;
+pub const KeySize: usize = 32;
 
 #[test]
 fn too_short() -> Result<(), Error> {

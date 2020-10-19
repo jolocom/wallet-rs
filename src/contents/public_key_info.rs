@@ -1,24 +1,15 @@
-use super::encryption::seal_box;
+use super::encryption::{KeySize, seal_box};
 use core::str::FromStr;
-use k256::{
-    EncodedPoint,
-    ecdsa::{
-        recoverable,
-        SigningKey,
-        VerifyKey,
-    },
-};
+use std::convert::TryInto;
+use crypto_box::PublicKey;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use chacha20poly1305::{
-    ChaCha20Poly1305,
-    Key,
+use k256::ecdsa::{
+    SigningKey,
+    Signature,
+    signature::Signer,
+    recoverable
 };
-use x25519_dalek::X25519_BASEPOINT_BYTES;
-use ed25519_dalek::{
-    Verifier,
-    PublicKey,
-};
-use sha3::{Digest, Keccak256};
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -27,7 +18,7 @@ pub struct PublicKeyInfo {
     #[serde(rename = "type")]
     pub key_type: KeyType,
     #[serde(rename = "publicKeyHex")]
-    pub public_key: Key,
+    pub public_key: Vec<u8>,
 }
 
 impl PublicKeyInfo {
@@ -35,7 +26,7 @@ impl PublicKeyInfo {
         Self {
             controller: vec![],
             key_type: kt,
-            public_key: Key::new(pk.to_vec()),
+            public_key: pk.to_vec(),
         }
     }
 
@@ -50,37 +41,50 @@ impl PublicKeyInfo {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
-                // is this really what we want? 
-                seal_box(data, &crypto_box::PublicKey::from(self.public_key.as_slice()))
+                let pk: [u8; KeySize] = self.public_key[..KeySize]
+                    .try_into()
+                    .map_err(|_| Error::BoxToSmall)?;
+                seal_box(data, &PublicKey::from(pk))
             }
             _ => Err(Error::WrongKeyType),
         }
     }
 
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
-        //&self.public_key.verify();
         match self.key_type {
             KeyType::Ed25519VerificationKey2018 => {
+                use ed25519_dalek::{PublicKey, Verifier, Signature};
                 let pk = PublicKey::from_bytes(&self.public_key)
-                    .map_err(|e| Error::Other(e))?;
-                Ok(match pk.verify(data, signature) {
-                    Ok(()) => true,
-                    Err(_) => false,
-                })
+                    .map_err(|e| Error::Other(Box::new(e)))?;
+                if signature.len() != 64 {
+                    return Err(Error::WrongKeyLength);
+                }
+                let signature = Signature::from(array_ref!(signature.to_owned(), 0, 64).to_owned());
+
+                Ok(pk.verify(data, &signature).is_ok())
             },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                Ok(match VerifyKey::from(&self.public_key)
-                    .verify(data, signature) {
-                        Ok(()) => true,
-                        Err(_) => false,
-                    })
+                use k256::ecdsa::{VerifyKey, signature::Verifier};
+                let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                Ok(vk.verify(data, signature).is_ok())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let signing_key = SigningKey::from(&self.public_key);
-                let verify_key = signing_key.verify_key();
-                let recovered_key = signature.recover_verify_key_from_digest(signature)?;
+                use k256::ecdsa::{self, recoverable};
+                // TODO find an appropriate constructor
+                let rs = ecdsa::Signature{bytes: generic_array::GenericArray::from_slice(signature).to_owned()};
+                let recovered_signature = recoverable::Signature::from_trial_recovery(
+                    &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
+                    data,
+                    &rs
+                ).map_err(|oe| Error::EcdsaCryptoError(oe))?;
 
-                Ok(signing_key == recovered_key)
+                let recovered_key = recovered_signature.recover_verify_key(data)
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+
+                let our_key = ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
+
+                Ok(our_key == recovered_key)
             }
             _ => Err(Error::WrongKeyType),
         }
@@ -129,17 +133,20 @@ pub enum PublicKeyEncoding {
     EthereumAddress(String),
 }
 
+// TODO: find out if they still required by any consumer
+// cleanup if not...
+
 pub fn to_recoverable_signature(
     v: u8,
     r: &[u8; 32],
     s: &[u8; 32],
 ) -> Result<recoverable::Signature, Error> {
-    let s_key = SigningKey::from(v);
+    let s_key = SigningKey::random(OsRng);
     let mut data = [0u8; 64];
     data[0..32].copy_from_slice(r);
     data[32..64].copy_from_slice(s);
 
-    Ok(s_key.sign(data))
+    Ok(s_key.sign(&data))
 }
 
 pub fn parse_concatenated(signature: &[u8]) -> Result<recoverable::Signature, Error> {

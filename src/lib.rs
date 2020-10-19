@@ -1,5 +1,6 @@
+#[macro_use]
+extern crate arrayref;
 extern crate aead;
-extern crate ecdsa;
 extern crate ed25519_dalek;
 extern crate chacha20poly1305;
 extern crate thiserror;
@@ -30,6 +31,8 @@ pub enum Error {
     /// Type of used key is invalid in this context
     #[error("key type wrong")]
     WrongKeyType,
+    #[error("key size incorrect")]
+    WrongKeyLength,
     /// No key found
     #[error("key not found")]
     KeyNotFound,
@@ -46,6 +49,10 @@ pub enum Error {
     /// Opaque errors wrapper for aead crate
     #[error("cryptography failure in aead: {0}")]
     AeadCryptoError(aead::Error),
+    #[error("cryptography failure in ecdsa: {0}")]
+    EcdsaCryptoError(k256::ecdsa::Error),
+    #[error("cryptography failure in ed25519: {0}")]
+    EdCryptoError(ed25519_dalek::ed25519::Error),
     //TODO: Remove after URSA decoupling
     // /// Opaque errors wrapper for ursa crate
     // #[error("cryptography failure in ursa: {0}")]
