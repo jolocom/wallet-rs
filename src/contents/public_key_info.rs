@@ -4,7 +4,6 @@ use std::convert::TryInto;
 use crypto_box::PublicKey;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use generic_array::GenericArray;
 use k256::ecdsa::{
     SigningKey,
     signature::Signer,
@@ -69,13 +68,15 @@ impl PublicKeyInfo {
                 use k256::ecdsa::{Signature, VerifyKey, signature::Verifier};
                 let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
                     .map_err(|e| Error::EcdsaCryptoError(e))?;
-                let sign = Signature{bytes: GenericArray::from_slice(signature).to_owned()};
+                let sign = Signature::from_asn1(signature)
+                    .map_err(|e| Error::EdCryptoError(e))?;
                 Ok(vk.verify(data, &sign).is_ok())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 use k256::ecdsa;
-                // TODO find an appropriate constructor
-                let rs = ecdsa::Signature{bytes: GenericArray::from_slice(signature).to_owned()};
+
+                let rs = ecdsa::Signature::from_asn1(signature)
+                    .map_err(|e| Error::EdCryptoError(e))?;
                 let recovered_signature = recoverable::Signature::from_trial_recovery(
                     &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
                     data,
