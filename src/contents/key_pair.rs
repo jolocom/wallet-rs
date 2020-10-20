@@ -203,12 +203,13 @@ fn key_pair_new_ecdsa_secp256k1() {
     assert_eq!(key_entry.public_key.public_key, expected_pk);
 }
 
-#[test] // TODO Finalize
-fn key_pair_new_ecdsa_x25519() -> Result<(), Error> {
-    // Self generated test vector.
-    let test_sk = hex::decode("1c1179a560d092b90458fe6ab8291215a427fcd6b3927cb240701778ef55201927c96646f2d4632d4fc241f84cbc427fbc3ecaa95becba55088d6c7b81fc5bbf").unwrap();
+#[test]
+fn key_pair_new_ecdsa_x25519() {
+    // Test vector from https://tools.ietf.org/html/rfc7748#section-6.1
+    let test_sk =
+        hex::decode("a8abababababababababababababababababababababababababababababab6b").unwrap();
     let expected_pk =
-        hex::decode("27c96646f2d4632d4fc241f84cbc427fbc3ecaa95becba55088d6c7b81fc5bbf").unwrap();
+        hex::decode("e3712d851a0e5d79b831c5e34ab22b41a198171de209b8b8faca23a11c624859").unwrap();
 
     let key_entry = KeyPair::new(KeyType::X25519KeyAgreementKey2019, &test_sk)?;
 
