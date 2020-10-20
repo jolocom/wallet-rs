@@ -16,7 +16,10 @@ use x25519_dalek::{
     StaticSecret,
 };
 use crypto_box::SecretKey;
-use ed25519_dalek::Keypair;
+use ed25519_dalek::{
+    self,
+    Keypair,
+};
 use rand_core::OsRng;
 use crate::Error;
 
@@ -31,10 +34,11 @@ impl KeyPair {
     pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<Self, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                let kp = Keypair::from_bytes(priv_key)
+                let sk = ed25519_dalek::SecretKey::from_bytes(priv_key)
                     .map_err(|e| Error::EdCryptoError(e))?;
-                let mut pk = *kp.public.as_bytes();
-                let mut sk = *kp.secret.as_bytes();
+                let pk: ed25519_dalek::PublicKey = (&sk).into();
+                let mut pk = *pk.as_bytes();
+                let mut sk = *sk.as_bytes();
                 (pk.iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
                 sk.iter_mut().map(|n| return *n).collect::<Vec<u8>>())
             },
@@ -167,7 +171,7 @@ fn key_pair_new_ed25519() {
     assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
     assert_eq!(key_entry.public_key.public_key, expected_pk);
     assert_eq!(
-        key_entry.private_key,
+        [&key_entry.private_key[..], &key_entry.public_key.public_key[..]].concat(),
         [&test_sk[..], &expected_pk[..]].concat()
     )
 }
