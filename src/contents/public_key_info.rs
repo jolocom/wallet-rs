@@ -4,9 +4,9 @@ use std::convert::TryInto;
 use crypto_box::PublicKey;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
+use generic_array::GenericArray;
 use k256::ecdsa::{
     SigningKey,
-    Signature,
     signature::Signer,
     recoverable
 };
@@ -59,20 +59,23 @@ impl PublicKeyInfo {
                 if signature.len() != 64 {
                     return Err(Error::WrongKeyLength);
                 }
-                let signature = Signature::from(array_ref!(signature.to_owned(), 0, 64).to_owned());
+                let owned_signature = signature.to_owned();
+                let array_signature = array_ref!(owned_signature, 0, 64).to_owned();
+                let signature = Signature::from(array_signature);
 
                 Ok(pk.verify(data, &signature).is_ok())
             },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                use k256::ecdsa::{VerifyKey, signature::Verifier};
+                use k256::ecdsa::{Signature, VerifyKey, signature::Verifier};
                 let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
                     .map_err(|e| Error::EcdsaCryptoError(e))?;
-                Ok(vk.verify(data, signature).is_ok())
+                let sign = Signature{bytes: GenericArray::from_slice(signature).to_owned()};
+                Ok(vk.verify(data, &sign).is_ok())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                use k256::ecdsa::{self, recoverable};
+                use k256::ecdsa;
                 // TODO find an appropriate constructor
-                let rs = ecdsa::Signature{bytes: generic_array::GenericArray::from_slice(signature).to_owned()};
+                let rs = ecdsa::Signature{bytes: GenericArray::from_slice(signature).to_owned()};
                 let recovered_signature = recoverable::Signature::from_trial_recovery(
                     &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
                     data,

@@ -4,20 +4,18 @@ use k256::{
     ecdsa::{
         SigningKey,
         VerifyKey,
+        Signature,
         signature::Signer,
         recoverable,
     },
 };
 use serde::{Deserialize, Serialize};
-use chacha20poly1305::{
-    ChaCha20Poly1305,
-};
 use x25519_dalek::{
     x25519,
     PublicKey,
     StaticSecret,
-    X25519_BASEPOINT_BYTES,
 };
+use crypto_box::SecretKey;
 use ed25519_dalek::Keypair;
 use rand_core::OsRng;
 use crate::Error;
@@ -35,8 +33,10 @@ impl KeyPair {
             KeyType::Ed25519VerificationKey2018 => {
                 let kp = Keypair::from_bytes(priv_key)
                     .map_err(|e| Error::EdCryptoError(e))?;
-                (kp.public.as_bytes().iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
-                kp.secret.as_bytes().iter_mut().map(|n| return *n).collect::<Vec<u8>>())
+                let mut pk = *kp.public.as_bytes();
+                let mut sk = *kp.secret.as_bytes();
+                (pk.iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
+                sk.iter_mut().map(|n| return *n).collect::<Vec<u8>>())
             },
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
@@ -48,7 +48,8 @@ impl KeyPair {
             },
              KeyType::X25519KeyAgreementKey2019 => {
                 let secret = StaticSecret::from(array_ref!(priv_key, 0, 32).to_owned());
-                (PublicKey::from(&secret).as_bytes().iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
+                let mut pk = *PublicKey::from(&secret).as_bytes();
+                (pk.iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
                 secret.to_bytes().iter_mut().map(|i| *i).collect::<Vec<u8>>())
              },
              _ => return Err(Error::UnsupportedKeyType),
@@ -67,14 +68,17 @@ impl KeyPair {
     pub fn random_pair(key_type: KeyType) -> Result<KeyPair, Error> {
         let (pk, sk) = match key_type {
             KeyType::X25519KeyAgreementKey2019 => {
-                let secret = StaticSecret::new(OsRng);
-                (PublicKey::from(&secret).as_bytes().iter_mut().map(|i| *i).collect::<Vec<u8>>(),
-                    secret.to_bytes().iter_mut().map(|i| *i).collect::<Vec<u8>>())
+                let sk = StaticSecret::new(OsRng);
+                let mut pk = *PublicKey::from(&sk).as_bytes();
+                (pk.iter_mut().map(|i| *i).collect::<Vec<u8>>(),
+                    sk.to_bytes().iter_mut().map(|i| *i).collect::<Vec<u8>>())
             },
             KeyType::Ed25519VerificationKey2018 => {
                 let kp = Keypair::generate(&mut OsRng);
-                (kp.public.as_bytes().iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
-                    kp.secret.as_bytes().iter_mut().map(|n| return *n).collect::<Vec<u8>>())
+                let mut pk = *kp.public.as_bytes();
+                let mut sk = *kp.secret.as_bytes();
+                (pk.iter_mut().map(|i| return *i).collect::<Vec<u8>>(),
+                    sk.iter_mut().map(|n| return *n).collect::<Vec<u8>>())
             },
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
@@ -103,17 +107,20 @@ impl KeyPair {
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                Ok(x25519(array_ref!(data, 0, 32), array_ref!(&self.private_key, 0, 32)))
+                Ok(x25519(array_ref!(data, 0, 32).to_owned(), array_ref!(&self.private_key, 0, 32).to_owned()).to_vec())
              },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                let sign_key = SigningKey::from(&self.private_key);
-                Ok(sign_key.sign(data))
+                let sign_key = SigningKey::new(&self.private_key)
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                let signature: Signature = sign_key.sign(data);
+                Ok(signature.as_ref().to_vec())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let sign_key = SigningKey::from(&self.private_key.0);
+                let sign_key = SigningKey::new(&self.private_key[..])
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
                 // WARN: Signature type must be annotated to be recoverable!
                 let signature: recoverable::Signature = sign_key.sign(data);
-                Ok(signature)
+                Ok(signature.as_ref().to_vec())
             },
             _ => Err(Error::WrongKeyType),
         }
@@ -121,10 +128,9 @@ impl KeyPair {
     pub fn decrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             // default use xChaCha20Poly1905 with x25519 key agreement
-            KeyType::X25519KeyAgreementKey2019 => unseal_box::<X25519_BASEPOINT_BYTES, ChaCha20Poly1305>(
+            KeyType::X25519KeyAgreementKey2019 => unseal_box(
                 data,
-                &self.public_key.public_key,
-                &self.private_key,
+                &SecretKey::from(array_ref!(&self.private_key, 0, 32).to_owned()),
             ),
             _ => Err(Error::WrongKeyType),
         }
@@ -159,15 +165,17 @@ fn key_pair_new_ed25519() {
 
     assert!(key_entry.public_key.key_type == KeyType::Ed25519VerificationKey2018);
     assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
-    assert_eq!(key_entry.public_key.public_key.0, expected_pk);
+    assert_eq!(key_entry.public_key.public_key, expected_pk);
     assert_eq!(
-        key_entry.private_key.0,
+        key_entry.private_key,
         [&test_sk[..], &expected_pk[..]].concat()
     )
 }
 
 #[test]
 fn keccak256_correct_output() {
+    use sha3::Keccak256;
+    use blake2::Digest;
     let input = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
     let mut hasher = Keccak256::new();
     hasher.update(input.as_bytes());
@@ -187,8 +195,8 @@ fn key_pair_new_ecdsa_secp256k1() {
 
     assert!(key_entry.public_key.key_type == KeyType::EcdsaSecp256k1VerificationKey2019);
     assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
-    assert_eq!(key_entry.private_key.0, test_sk);
-    assert_eq!(key_entry.public_key.public_key.0, expected_pk);
+    assert_eq!(key_entry.private_key, test_sk);
+    assert_eq!(key_entry.public_key.public_key, expected_pk);
 }
 
 #[test] // TODO Finalize
@@ -202,7 +210,7 @@ fn key_pair_new_ecdsa_x25519() -> Result<(), Error> {
 
     assert!(key_entry.public_key.key_type == KeyType::X25519KeyAgreementKey2019);
     assert_eq!(key_entry.public_key.controller, Vec::<String>::new());
-    assert_eq!(key_entry.private_key.0, test_sk);
-    assert_eq!(key_entry.public_key.public_key.0, expected_pk);
+    assert_eq!(key_entry.private_key, test_sk);
+    assert_eq!(key_entry.public_key.public_key, expected_pk);
     Ok(())
 }
