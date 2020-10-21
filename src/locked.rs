@@ -1,6 +1,5 @@
 use super::unlocked::UnlockedWallet;
 use super::Error;
-use generic_array::GenericArray;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use sha3::{
@@ -8,7 +7,8 @@ use sha3::{
     Sha3_256
 };
 use chacha20poly1305::{
-    ChaCha20Poly1305,
+    XNonce,
+    XChaCha20Poly1305,
     aead::{
         Aead,
         NewAead
@@ -33,10 +33,10 @@ impl LockedWallet {
         sha3.update(key);
         let pass = sha3.finalize();
 
-        let cha_cha = ChaCha20Poly1305::new(&GenericArray::from_slice(key));
-        
+        let cha_cha = XChaCha20Poly1305::new(&pass);
+        let nonce = XNonce::from_slice(self.id.as_bytes());
         let dec = cha_cha
-            .decrypt(GenericArray::from_slice(self.id.as_bytes()), self.ciphertext.as_slice())
+            .decrypt(nonce, self.ciphertext.as_slice())
             .map_err(|e| Error::AeadCryptoError(e))?;
 
         let as_str = std::str::from_utf8(&dec)

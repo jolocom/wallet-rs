@@ -204,7 +204,7 @@ fn key_pair_new_ecdsa_secp256k1() {
 }
 
 #[test]
-fn key_pair_new_ecdsa_x25519() {
+fn key_pair_new_ecdsa_x25519() -> Result<(), Error> {
     // Test vector from https://tools.ietf.org/html/rfc7748#section-6.1
     let test_sk =
         hex::decode("a8abababababababababababababababababababababababababababababab6b").unwrap();

@@ -53,10 +53,6 @@ pub enum Error {
     EcdsaCryptoError(k256::ecdsa::Error),
     #[error("cryptography failure in ed25519: {0}")]
     EdCryptoError(ed25519_dalek::ed25519::Error),
-    //TODO: Remove after URSA decoupling
-    // /// Opaque errors wrapper for ursa crate
-    // #[error("cryptography failure in ursa: {0}")]
-    // UrsaCryptoError(ursa::CryptoError),
     /// Opaque errors wrapper for secp256k1 crate
     /// #Transparent errors
     ///
@@ -79,7 +75,7 @@ mod tests {
     #[test]
     fn secp256k1_recoverable_round_trip() -> Result<(), Error> {
         let message = "hello".as_bytes();
-        let mut w = UnlockedWallet::new("thing");
+        let mut w = UnlockedWallet::new("thing is very beautiful!");
         let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
 
         let sig = w.sign_raw(&pk_info.id, &message)?;
@@ -95,7 +91,7 @@ mod tests {
 
     #[test]
     fn wallet() -> Result<(), Error> {
-        let mut w = UnlockedWallet::new("thing");
+        let mut w = UnlockedWallet::new("thing is very beautiful!");
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;

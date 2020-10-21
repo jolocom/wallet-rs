@@ -3,7 +3,6 @@ use crate::{
     locked::LockedWallet,
     Error,
 };
-use generic_array::GenericArray;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sha3::{
@@ -11,7 +10,8 @@ use sha3::{
     Sha3_256
 };
 use chacha20poly1305::{
-    ChaCha20Poly1305,
+    XNonce,
+    XChaCha20Poly1305,
     aead::{
         Aead,
         NewAead,
@@ -132,13 +132,13 @@ impl UnlockedWallet {
         sha3.update(key);
         let pass = sha3.finalize();
 
-        let cha_cha = ChaCha20Poly1305::new(GenericArray::from_slice(key));
-
+        let cha_cha = XChaCha20Poly1305::new(&pass);
+        let nonce = XNonce::from_slice(self.id.as_bytes());
         Ok(LockedWallet {
             id: self.id.clone(),
             ciphertext: cha_cha
                 .encrypt(
-                    GenericArray::from_slice(self.id.as_bytes()),
+                    nonce,
                     to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
                 )
                 .map_err(|e| Error::AeadCryptoError(e))?,

@@ -4,11 +4,11 @@ use crypto_box::{
     SecretKey,
     aead::Aead,
 };
-use generic_array::GenericArray;
 use rand_core::OsRng;
-use crate::Error;
 use blake2::{Blake2b, Digest};
 use std::convert::TryInto;
+use generic_array::GenericArray;
+use crate::Error;
 
 pub fn make_channel(
     their_public: &PublicKey,
@@ -25,8 +25,9 @@ pub fn make_box(
     secret_key: &SecretKey,
     nonce: &[u8],
 ) -> Result<Vec<u8>, Error> {
+    let nonce = GenericArray::from_slice(nonce);
     make_channel(public_key, secret_key)
-        .encrypt(GenericArray::from_slice(nonce), data)
+        .encrypt(&nonce, data)//GenericArray::from_slice(nonce), data)
         .map_err(|e| Error::AeadCryptoError(e))
 }
 /// Seal Box
@@ -56,8 +57,9 @@ pub fn open_box(
     sk: &SecretKey,
     nonce: &[u8],
 ) -> Result<Vec<u8>, Error> {
+    let nonce = GenericArray::from_slice(nonce);
     make_channel(pk, sk)
-        .decrypt(GenericArray::from_slice(nonce), data)
+        .decrypt(&nonce, data)
         .map_err(|e| Error::AeadCryptoError(e))
 }
 
@@ -69,14 +71,14 @@ pub fn unseal_box(
     data: &[u8],
     rsk: &SecretKey,
 ) -> Result<Vec<u8>, Error> {
-    if data.len() < KeySize {
+    if data.len() < KEYSIZE {
         Err(Error::BoxToSmall)
     } else {
-        let pk_slice: [u8; KeySize] = data[..KeySize].try_into().map_err(|_| Error::BoxToSmall)?; 
+        let pk_slice: [u8; KEYSIZE] = data[..KEYSIZE].try_into().map_err(|_| Error::BoxToSmall)?; 
         let epk = PublicKey::from(pk_slice);
         let rpk = PublicKey::from(rsk);
         open_box(
-            &data[KeySize..],
+            &data[KEYSIZE..],
             &epk,
             rsk,
             &Blake2b::new().chain(&epk.as_bytes()).chain(&rpk.as_bytes()).finalize()[..24],
@@ -84,12 +86,11 @@ pub fn unseal_box(
     }
 }
 
-pub const KeySize: usize = 32;
+pub const KEYSIZE: usize = 32;
 
 #[test]
 fn too_short() -> Result<(), Error> {
     let sk = SecretKey::generate(&mut OsRng);
-    let pk = PublicKey::from(&sk);
 
     let message = b"bla";
 

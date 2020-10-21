@@ -1,10 +1,11 @@
-use super::encryption::{KeySize, seal_box};
+use super::encryption::{KEYSIZE, seal_box};
 use core::str::FromStr;
 use std::convert::TryInto;
 use crypto_box::PublicKey;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use k256::ecdsa::{
+    self,
     SigningKey,
     signature::Signer,
     recoverable
@@ -40,7 +41,7 @@ impl PublicKeyInfo {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
-                let pk: [u8; KeySize] = self.public_key[..KeySize]
+                let pk: [u8; KEYSIZE] = self.public_key[..KEYSIZE]
                     .try_into()
                     .map_err(|_| Error::BoxToSmall)?;
                 seal_box(data, &PublicKey::from(pk))
@@ -68,14 +69,16 @@ impl PublicKeyInfo {
                 use k256::ecdsa::{Signature, VerifyKey, signature::Verifier};
                 let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
                     .map_err(|e| Error::EcdsaCryptoError(e))?;
-                let sign = Signature::from_asn1(signature)
+                let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
+                let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
+                let sign = Signature::from_scalars(s1, s2)
                     .map_err(|e| Error::EdCryptoError(e))?;
                 Ok(vk.verify(data, &sign).is_ok())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                use k256::ecdsa;
-
-                let rs = ecdsa::Signature::from_asn1(signature)
+                let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
+                let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
+                let rs = ecdsa::Signature::from_scalars(s1, s2)
                     .map_err(|e| Error::EdCryptoError(e))?;
                 let recovered_signature = recoverable::Signature::from_trial_recovery(
                     &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
