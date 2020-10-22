@@ -31,8 +31,7 @@ pub struct KeyPair {
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
     /// Private key in form of vector of bytes.
-    // TODO: should this prop really be pub???
-    pub private_key: Vec<u8>,
+    private_key: Vec<u8>,
 }
 
 impl KeyPair {
@@ -90,6 +89,13 @@ impl KeyPair {
             },
             private_key: sk,
         })
+    }
+
+    pub fn from_keys(public_key: PublicKeyInfo, private_key: Vec<u8>) -> Self {
+        KeyPair {
+            public_key,
+            private_key
+        }
     }
 
     pub fn random_pair(key_type: KeyType) -> Result<KeyPair, Error> {
@@ -164,6 +170,9 @@ impl KeyPair {
     }
     pub fn clean(&self) -> PublicKeyInfo {
         self.public_key.clone()
+    }
+    pub fn private_key(&self) -> Vec<u8> {
+        self.private_key.clone()
     }
 }
 

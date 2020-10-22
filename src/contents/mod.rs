@@ -98,13 +98,10 @@ impl Contents {
                     controller: vec![controller.to_string()],
                     ..pk.clone()
                 }),
-                Content::KeyPair(kp) => Content::KeyPair(KeyPair {
-                    public_key: PublicKeyInfo {
-                        controller: vec![controller.to_string()],
-                        ..kp.public_key.clone()
-                    },
-                    ..kp.clone()
-                }),
+                Content::KeyPair(kp) => Content::KeyPair(KeyPair::from_keys(
+                    kp.public_key.clone(),
+                    kp.private_key()
+                )),
                 _ => oldk,
             },
         );
