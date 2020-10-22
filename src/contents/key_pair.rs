@@ -23,14 +23,37 @@ use ed25519_dalek::{
 use rand_core::OsRng;
 use crate::Error;
 
+/// Serializable struct to hold pair of public and private keys.
+/// Universal for any key types as keys stored as bytes.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KeyPair {
+    /// Public key is instance of `PublicKeyInfo` struct.
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
+    /// Private key in form of vector of bytes.
+    // TODO: should this prop really be pub???
     pub private_key: Vec<u8>,
 }
 
 impl KeyPair {
+    /// Constructs set of keys from private key.
+    /// Public key generated in the method from private key provided.
+    ///
+    /// # Arguments
+    ///
+    /// *`key_type` - variont of `KeyType` enum.
+    /// Currently supportet key types are:
+    /// `Ed25519VerificationKey2018` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ed25519)
+    /// `EcdsaSecp256k1VerificationKey2019` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1signature2019)
+    /// `EcdsaSecp256k1RecoveryMethod2020` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1recoverysignature2020)
+    //  TODO: find proper link for x25519 key
+    /// `X25519KeyAgreementKey2019` [W3C](https://www.w3.org/TR/did-core/#key-types-and-formats)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::KeyType;
+    /// 
     pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<Self, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
