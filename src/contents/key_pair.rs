@@ -43,17 +43,12 @@ impl KeyPair {
     ///
     /// *`key_type` - variont of `KeyType` enum.
     /// Currently supportet key types are:
-    /// `Ed25519VerificationKey2018` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ed25519)
-    /// `EcdsaSecp256k1VerificationKey2019` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1signature2019)
-    /// `EcdsaSecp256k1RecoveryMethod2020` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1recoverysignature2020)
+    /// `Ed25519VerificationKey2018` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ed25519)<br>
+    /// `EcdsaSecp256k1VerificationKey2019` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1signature2019)<br>
+    /// `EcdsaSecp256k1RecoveryMethod2020` [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1recoverysignature2020)<br>
     //  TODO: find proper link for x25519 key
-    /// `X25519KeyAgreementKey2019` [W3C](https://www.w3.org/TR/did-core/#key-types-and-formats)
+    /// `X25519KeyAgreementKey2019` [W3C](https://www.w3.org/TR/did-core/#key-types-and-formats)<br>
     ///
-    /// # Examples
-    ///
-    /// 
-    /// 
-    /// 
     pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<Self, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
@@ -89,6 +84,28 @@ impl KeyPair {
         })
     }
 
+    /// Generates random `KeyPair` of specified `KeyType` type.
+    ///
+    /// *`key_type` - variont of `KeyType` enum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::{
+    /// #    universal_wallet::{
+    /// #       Error,
+    /// #       contents::{
+    /// #           public_key_info::KeyType,
+    /// #           key_pair::KeyPair,
+    /// #       },
+    /// #    },
+    /// # };
+    /// # fn rkp() -> Result<(), Error> {
+    ///     let key_pair = KeyPair::random_pair(KeyType::EcdsaSecp256k1VerificationKey2019)?;
+    /// #   Ok(())
+    /// # }
+    /// ```
+    ///
     pub fn random_pair(key_type: KeyType) -> Result<KeyPair, Error> {
         let (pk, sk) = match key_type {
             KeyType::X25519KeyAgreementKey2019 => {
