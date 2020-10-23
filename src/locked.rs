@@ -34,9 +34,12 @@ impl LockedWallet {
         let pass = sha3.finalize();
 
         let cha_cha = XChaCha20Poly1305::new(&pass);
-        let nonce = XNonce::from_slice(self.id.as_bytes());
+
+        let nonce_start = self.ciphertext.len() - 24;
+        let nonce = XNonce::from_slice(&self.ciphertext[nonce_start..]);
+        let content = &self.ciphertext[..nonce_start];
         let dec = cha_cha
-            .decrypt(nonce, self.ciphertext.as_slice())
+            .decrypt(&nonce, content)
             .map_err(|e| Error::AeadCryptoError(e))?;
 
         let as_str = std::str::from_utf8(&dec)

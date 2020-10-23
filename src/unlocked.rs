@@ -3,6 +3,7 @@ use crate::{
     locked::LockedWallet,
     Error,
 };
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sha3::{
@@ -133,16 +134,23 @@ impl UnlockedWallet {
         let pass = sha3.finalize();
 
         let cha_cha = XChaCha20Poly1305::new(&pass);
-        let nonce = XNonce::from_slice(self.id.as_bytes());
+        let mut nonce = get_nonce();//XNonce::from_slice(self.id.as_bytes());
+        let mut cypher = cha_cha
+        .encrypt(
+            &nonce,
+            to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
+        )
+        .map_err(|e| Error::AeadCryptoError(e))?;
+        cypher.append(&mut nonce.iter_mut().map(|v| *v).collect());
         Ok(LockedWallet {
             id: self.id.clone(),
-            ciphertext: cha_cha
-                .encrypt(
-                    nonce,
-                    to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
-                )
-                .map_err(|e| Error::AeadCryptoError(e))?,
+            ciphertext: cypher
         })
     }
 
+}
+fn get_nonce() -> XNonce {
+    let mut base = [0u8; 24];
+    OsRng.fill_bytes(&mut base);
+    *XNonce::from_slice(&base)
 }
