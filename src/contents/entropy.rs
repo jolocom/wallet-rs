@@ -1,5 +1,9 @@
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize
+};
 
+/// Entropy type for JSON serialization
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Entropy {
     #[serde(rename = "type")]

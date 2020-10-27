@@ -49,6 +49,14 @@ pub fn seal_box(
     .concat())
 }
 
+/// Decripts message and returns rav `Vec` of bytes
+///
+/// # Parameters
+///
+/// * data - cypher data [messag]
+/// * pk - `PublicKey` refference
+/// * sk - `SecretKey` refference
+///
 pub fn open_box(
     data: &[u8],
     pk: &PublicKey,
@@ -65,6 +73,12 @@ pub fn open_box(
 ///
 /// Opens an anoncrypted box 
 /// NOTE: key length is 32 bytes, hence the magic numbers
+///
+/// # Parameters
+///
+/// * data - slice of cypher joined with the cryptography information
+/// * rsk - secret key for the cryptography
+///
 pub fn unseal_box(
     data: &[u8],
     rsk: &SecretKey,
@@ -84,6 +98,7 @@ pub fn unseal_box(
     }
 }
 
+/// Size of the key sued for cryptography
 pub const KEYSIZE: usize = 32;
 
 #[test]

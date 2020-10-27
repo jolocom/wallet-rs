@@ -14,13 +14,24 @@ use chacha20poly1305::{
         NewAead
     },
 };
+
+/// Represents wallet in locked (encrypted) state
 #[derive(Serialize, Deserialize)]
 pub struct LockedWallet {
+    /// Wallet ID
     pub id: String,
+    /// Encrypted wallet Content
     pub ciphertext: Vec<u8>,
 }
 
 impl LockedWallet {
+    /// Instantiates encrypted wallet from ID and ciphertext
+    ///
+    /// # Parameters
+    ///
+    /// * id - `&str` of wallet's ID
+    /// * ct - encrypted content of the wallet
+    ///
     pub fn new(id: &str, ct: Vec<u8>) -> Self {
         Self {
             id: id.to_string(),
@@ -28,6 +39,12 @@ impl LockedWallet {
         }
     }
 
+    /// Unlocks the wallet into `UnlockedWallet`
+    ///
+    /// # Parameters
+    ///
+    /// * key - password to decrypt content with
+    ///
     pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
         sha3.update(key);
