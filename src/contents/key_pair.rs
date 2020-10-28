@@ -153,7 +153,13 @@ impl KeyPair {
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                Ok(x25519(array_ref!(data, 0, 32).to_owned(), array_ref!(&self.private_key, 0, 32).to_owned()).to_vec())
+                let mut pk = self.public_key.public_key.clone();
+                let mut spk = self.private_key.clone();
+                spk.append(&mut pk);
+                let kp = Keypair::from_bytes(&spk.as_ref())
+                    .map_err(|e| Error::EdCryptoError(e))?;
+                let sig = kp.sign(data);
+                Ok(sig.to_bytes().into())
              },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
                 let sign_key = SigningKey::new(&self.private_key)
