@@ -11,7 +11,6 @@ use k256::{
 };
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{
-    x25519,
     PublicKey,
     StaticSecret,
 };
