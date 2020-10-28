@@ -1,15 +1,13 @@
+#[macro_use]
+extern crate arrayref;
 extern crate aead;
+extern crate ed25519_dalek;
+extern crate chacha20poly1305;
 extern crate thiserror;
 
 pub mod contents;
 pub mod locked;
 pub mod unlocked;
-
-use ursa::encryption::random_vec;
-
-pub fn get_random(len: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Ok(random_vec(len).map_err(|e| Error::AeadCryptoError(e))?)
-}
 
 pub mod prelude {
     pub use crate::contents::{
@@ -33,6 +31,8 @@ pub enum Error {
     /// Type of used key is invalid in this context
     #[error("key type wrong")]
     WrongKeyType,
+    #[error("key size incorrect")]
+    WrongKeyLength,
     /// No key found
     #[error("key not found")]
     KeyNotFound,
@@ -49,12 +49,11 @@ pub enum Error {
     /// Opaque errors wrapper for aead crate
     #[error("cryptography failure in aead: {0}")]
     AeadCryptoError(aead::Error),
-    /// Opaque errors wrapper for ursa crate
-    #[error("cryptography failure in ursa: {0}")]
-    UrsaCryptoError(ursa::CryptoError),
+    #[error("cryptography failure in ecdsa: {0}")]
+    EcdsaCryptoError(k256::ecdsa::Error),
+    #[error("cryptography failure in ed25519: {0}")]
+    EdCryptoError(ed25519_dalek::ed25519::Error),
     /// Opaque errors wrapper for secp256k1 crate
-    #[error("cryptography failure in secp256k1: {0}")]
-    SecpCryptoError(secp256k1::Error),
     /// #Transparent errors
     ///
     /// Serde crate errors
@@ -76,7 +75,7 @@ mod tests {
     #[test]
     fn secp256k1_recoverable_round_trip() -> Result<(), Error> {
         let message = "hello".as_bytes();
-        let mut w = UnlockedWallet::new("thing");
+        let mut w = UnlockedWallet::new("thing is very beautiful!");
         let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
 
         let sig = w.sign_raw(&pk_info.id, &message)?;
@@ -92,7 +91,7 @@ mod tests {
 
     #[test]
     fn wallet() -> Result<(), Error> {
-        let mut w = UnlockedWallet::new("thing");
+        let mut w = UnlockedWallet::new("thing is very beautiful!");
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
         w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;

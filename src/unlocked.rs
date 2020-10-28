@@ -3,11 +3,20 @@ use crate::{
     locked::LockedWallet,
     Error,
 };
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use ursa::{
-    encryption::symm::prelude::*,
-    hash::{sha3::Sha3_256, Digest},
+use sha3::{
+    Digest,
+    Sha3_256
+};
+use chacha20poly1305::{
+    XNonce,
+    XChaCha20Poly1305,
+    aead::{
+        Aead,
+        NewAead,
+    },
 };
 
 #[derive(Serialize, Deserialize)]
@@ -121,21 +130,27 @@ impl UnlockedWallet {
 
     pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
-        sha3.input(key);
-        let pass = sha3.result();
+        sha3.update(key);
+        let pass = sha3.finalize();
 
-        let x_cha_cha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
-            .map_err(|e| Error::AeadCryptoError(e))?;
-
+        let cha_cha = XChaCha20Poly1305::new(&pass);
+        let mut nonce = get_nonce();//XNonce::from_slice(self.id.as_bytes());
+        let mut cypher = cha_cha
+        .encrypt(
+            &nonce,
+            to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
+        )
+        .map_err(|e| Error::AeadCryptoError(e))?;
+        cypher.append(&mut nonce.iter_mut().map(|v| *v).collect());
         Ok(LockedWallet {
             id: self.id.clone(),
-            ciphertext: x_cha_cha
-                .encrypt_easy(
-                    self.id.as_bytes(),
-                    &to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
-                )
-                .map_err(|e| Error::AeadCryptoError(e))?,
+            ciphertext: cypher
         })
     }
 
+}
+fn get_nonce() -> XNonce {
+    let mut base = [0u8; 24];
+    OsRng.fill_bytes(&mut base);
+    *XNonce::from_slice(&base)
 }

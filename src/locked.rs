@@ -2,11 +2,18 @@ use super::unlocked::UnlockedWallet;
 use super::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
-use ursa::{
-    encryption::symm::prelude::*,
-    hash::{sha3::Sha3_256, Digest},
+use sha3::{
+    Digest,
+    Sha3_256
 };
-
+use chacha20poly1305::{
+    XNonce,
+    XChaCha20Poly1305,
+    aead::{
+        Aead,
+        NewAead
+    },
+};
 #[derive(Serialize, Deserialize)]
 pub struct LockedWallet {
     pub id: String,
@@ -23,14 +30,16 @@ impl LockedWallet {
 
     pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, Error> {
         let mut sha3 = Sha3_256::new();
-        sha3.input(key);
-        let pass = sha3.result();
+        sha3.update(key);
+        let pass = sha3.finalize();
 
-        let x_cha_cha = SymmetricEncryptor::<XChaCha20Poly1305>::new_with_key(pass)
-            .map_err(|e| Error::AeadCryptoError(e))?;
+        let cha_cha = XChaCha20Poly1305::new(&pass);
 
-        let dec = x_cha_cha
-            .decrypt_easy(self.id.as_bytes(), &self.ciphertext)
+        let nonce_start = self.ciphertext.len() - 24;
+        let nonce = XNonce::from_slice(&self.ciphertext[nonce_start..]);
+        let content = &self.ciphertext[..nonce_start];
+        let dec = cha_cha
+            .decrypt(&nonce, content)
             .map_err(|e| Error::AeadCryptoError(e))?;
 
         let as_str = std::str::from_utf8(&dec)

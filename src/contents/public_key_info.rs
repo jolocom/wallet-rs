@@ -1,13 +1,15 @@
-use super::encryption::seal_box;
+use super::encryption::{KEYSIZE, seal_box};
 use core::str::FromStr;
-use secp256k1::{recovery::RecoverableSignature, Message, Secp256k1};
+use std::convert::TryInto;
+use crypto_box::PublicKey;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use ursa::{
-    encryption::symm::prelude::*, kex::x25519::X25519Sha256, keys::PublicKey,
-    signatures::prelude::*,
+use k256::ecdsa::{
+    self,
+    SigningKey,
+    signature::Signer,
+    recoverable
 };
-use sha3::{Digest, Keccak256};
-
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -16,7 +18,7 @@ pub struct PublicKeyInfo {
     #[serde(rename = "type")]
     pub key_type: KeyType,
     #[serde(rename = "publicKeyHex")]
-    pub public_key: PublicKey,
+    pub public_key: Vec<u8>,
 }
 
 impl PublicKeyInfo {
@@ -24,7 +26,7 @@ impl PublicKeyInfo {
         Self {
             controller: vec![],
             key_type: kt,
-            public_key: PublicKey(pk.to_vec()),
+            public_key: pk.to_vec(),
         }
     }
 
@@ -39,7 +41,10 @@ impl PublicKeyInfo {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
-                seal_box::<X25519Sha256, XChaCha20Poly1305>(data, &self.public_key)
+                let pk: [u8; KEYSIZE] = self.public_key[..KEYSIZE]
+                    .try_into()
+                    .map_err(|_| Error::BoxToSmall)?;
+                seal_box(data, &PublicKey::from(pk))
             }
             _ => Err(Error::WrongKeyType),
         }
@@ -48,37 +53,45 @@ impl PublicKeyInfo {
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
         match self.key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                let ed = Ed25519Sha512::new();
-                ed.verify(data, signature, &self.public_key)
-                    .map_err(|e| Error::UrsaCryptoError(e))
-            }
+                use ed25519_dalek::{PublicKey, Verifier, Signature};
+                let pk = PublicKey::from_bytes(&self.public_key)
+                    .map_err(|e| Error::Other(Box::new(e)))?;
+                if signature.len() != 64 {
+                    return Err(Error::WrongKeyLength);
+                }
+                let owned_signature = signature.to_owned();
+                let array_signature = array_ref!(owned_signature, 0, 64).to_owned();
+                let signature = Signature::from(array_signature);
+
+                Ok(pk.verify(data, &signature).is_ok())
+            },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                let scp = EcdsaSecp256k1Sha256::new();
-                scp.verify(data, signature, &self.public_key)
-                    .map_err(|e| Error::UrsaCryptoError(e))
-            }
-
+                use k256::ecdsa::{Signature, VerifyKey, signature::Verifier};
+                let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
+                let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
+                let sign = Signature::from_scalars(s1, s2)
+                    .map_err(|e| Error::EdCryptoError(e))?;
+                Ok(vk.verify(data, &sign).is_ok())
+            },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let scp = Secp256k1::new();
+                let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
+                let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
+                let rs = ecdsa::Signature::from_scalars(s1, s2)
+                    .map_err(|e| Error::EdCryptoError(e))?;
+                let recovered_signature = recoverable::Signature::from_trial_recovery(
+                    &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
+                    data,
+                    &rs
+                ).map_err(|oe| Error::EcdsaCryptoError(oe))?;
 
-                let mut hasher = Keccak256::new();
-                hasher.update(data);
+                let recovered_key = recovered_signature.recover_verify_key(data)
+                    .map_err(|e| Error::EcdsaCryptoError(e))?;
 
-                let output = hasher.finalize();
+                let our_key = ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
 
-                let message =
-                    Message::from_slice(&output).map_err(|e| Error::Other(Box::new(e)))?;
-
-                let signature = parse_concatenated(&signature)?;
-
-                let signing_key = scp
-                    .recover(&message, &signature)
-                    .map_err(|e| Error::SecpCryptoError(e))?;
-
-                let our_key = secp256k1::PublicKey::from_slice(&self.public_key.0)
-                    .map_err(|e| Error::SecpCryptoError(e))?;
-
-                Ok(signing_key == our_key)
+                Ok(our_key == recovered_key)
             }
             _ => Err(Error::WrongKeyType),
         }
@@ -127,23 +140,23 @@ pub enum PublicKeyEncoding {
     EthereumAddress(String),
 }
 
+// TODO: find out if they still required by any consumer
+// cleanup if not...
+
 pub fn to_recoverable_signature(
     v: u8,
     r: &[u8; 32],
     s: &[u8; 32],
-) -> Result<secp256k1::recovery::RecoverableSignature, Error> {
-    let rec_id = secp256k1::recovery::RecoveryId::from_i32(v as i32)
-        .map_err(|e| Error::SecpCryptoError(e))?;
-
+) -> Result<recoverable::Signature, Error> {
+    let s_key = SigningKey::random(OsRng);
     let mut data = [0u8; 64];
     data[0..32].copy_from_slice(r);
     data[32..64].copy_from_slice(s);
 
-    Ok(secp256k1::recovery::RecoverableSignature::from_compact(&data, rec_id)
-        .map_err(|e| Error::SecpCryptoError(e))?)
+    Ok(s_key.sign(&data))
 }
 
-pub fn parse_concatenated(signature: &[u8]) -> Result<RecoverableSignature, Error> {
+pub fn parse_concatenated(signature: &[u8]) -> Result<recoverable::Signature, Error> {
     let mut r = [0u8; 32];
     let mut s = [0u8; 32];
     let v = signature[64];
