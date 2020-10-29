@@ -5,7 +5,6 @@ pub mod public_key_info;
 
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 
-use key_pair::KeyPair;
 use public_key_info::PublicKeyInfo;
 use std::collections::hash_map::*;
 use uuid::Uuid;
@@ -24,7 +23,7 @@ impl ContentEntity {
     /// Cleans the entity of any sensative material
     pub fn clean(self) -> Self {
         match self.content {
-            Content::KeyPair(kp) => Content::PublicKey(kp.clean()).to_entity(&self.id),
+            Content::KeyPair(kp) => Content::PublicKey(kp.get_public_key()).to_entity(&self.id),
             _ => self,
         }
     }
@@ -98,13 +97,9 @@ impl Contents {
                     controller: vec![controller.to_string()],
                     ..pk.clone()
                 }),
-                Content::KeyPair(kp) => Content::KeyPair(KeyPair {
-                    public_key: PublicKeyInfo {
-                        controller: vec![controller.to_string()],
-                        ..kp.public_key.clone()
-                    },
-                    ..kp.clone()
-                }),
+                Content::KeyPair(kp) => {
+                    Content::KeyPair(kp.set_controller(vec!(controller.to_owned())))
+                },
                 _ => oldk,
             },
         );

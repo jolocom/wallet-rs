@@ -30,8 +30,7 @@ pub struct KeyPair {
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
     /// Private key in form of vector of bytes.
-    // TODO: should this prop really be pub???
-    pub private_key: Vec<u8>,
+    private_key: Vec<u8>,
 }
 
 impl KeyPair {
@@ -132,12 +131,24 @@ impl KeyPair {
             private_key: sk,
         })
     }
-    pub fn controller(self, controller: Vec<String>) -> Self {
+
+    /// Updates `.controller` property to provided value.
+    ///
+    /// *`controller` - collection of controller `String`s.
+    ///
+    pub fn set_controller(self, controller: Vec<String>) -> Self {
         KeyPair {
             public_key: self.public_key.controller(controller),
             ..self
         }
     }
+
+    /// Signst provided message with the key from `KeyType` set during `KeyPair` creation.
+    ///
+    /// *`data` - message slice to be signed
+    ///
+    /// Returns `Result` of generated signature in form of `Vec<u8>` or `Error`.
+    ///
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             KeyType::Ed25519VerificationKey2018 => {
@@ -165,7 +176,15 @@ impl KeyPair {
             _ => Err(Error::WrongKeyType),
         }
     }
-    pub fn decrypt(&self, data: &[u8], _aad: &[u8]) -> Result<Vec<u8>, Error> {
+
+    /// Decrypts cipher data using current private key.
+    ///
+    /// *`data` - cipher to be derypted.
+    ///
+    /// Returns `Result` of raw representation of the data in form of `Vec<u8>` or
+    ///     `Error` indication failure.
+    ///
+    pub fn decrypt(&self, data: &[u8], _aad: Option<&[u8]>) -> Result<Vec<u8>, Error> {
         match self.public_key.key_type {
             // default use xChaCha20Poly1905 with x25519 key agreement
             KeyType::X25519KeyAgreementKey2019 => unseal_box(
@@ -175,11 +194,19 @@ impl KeyPair {
             _ => Err(Error::WrongKeyType),
         }
     }
-    pub fn clean(&self) -> PublicKeyInfo {
+
+    /// Returns `Clone`d instance of `PublicKeyInfo` from own `public_key` property.
+    pub fn get_public_key(&self) -> PublicKeyInfo {
         self.public_key.clone()
+    }
+
+    /// Returns `Clone`d instance of `Vec<u8>` from own private key.
+    pub fn private_key(&self) -> Vec<u8> {
+        self.private_key.clone()
     }
 }
 
+/// This `enum` indicates encoding for each Private Key
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PrivateKeyEncoding {
