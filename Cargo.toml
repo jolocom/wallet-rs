@@ -7,6 +7,7 @@ edition = "2018"
 description = "Rust implementation of the Universal Wallet 2020 Specification"
 license = "Apache-2.0"
 homepage = "https://jolocom.com/"
+documentation = "https://docs.rs/universal_wallet"
 repository = "https://github.com/jolocom/wallet-rs"
 readme = "README.md"
 keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
