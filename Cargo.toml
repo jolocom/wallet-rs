@@ -2,7 +2,7 @@
 name = "universal_wallet"
 version = "0.3.0"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>",
-            "Ivan Temchenko <35359595i@gmail.com"]
+            "Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 description = "Rust implementation of the Universal Wallet 2020 Specification"
 license = "Apache-2.0"
