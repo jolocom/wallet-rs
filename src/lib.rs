@@ -4,6 +4,9 @@ extern crate aead;
 extern crate ed25519_dalek;
 extern crate chacha20poly1305;
 extern crate thiserror;
+extern crate wasm_bindgen;
+
+use wasm_bindgen::prelude::*;
 
 pub mod contents;
 pub mod locked;
@@ -20,6 +23,7 @@ pub mod prelude {
 }
 
 /// Wrapper enum for proper error handling
+#[wasm_bindgen]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Indicates error during key insertion
@@ -46,25 +50,25 @@ pub enum Error {
     KeyPairAddFailed,
     /// External encryption errors
     ///
-    /// Opaque errors wrapper for aead crate
-    #[error("cryptography failure in aead: {0}")]
-    AeadCryptoError(aead::Error),
-    #[error("cryptography failure in ecdsa: {0}")]
-    EcdsaCryptoError(k256::ecdsa::Error),
-    #[error("cryptography failure in ed25519: {0}")]
-    EdCryptoError(ed25519_dalek::ed25519::Error),
+    /// Non-paque errors wrapper for aead crate
+    #[error("cryptography failure in aead")]
+    AeadCryptoError,
+    #[error("cryptography failure in ecdsa")]
+    EcdsaCryptoError,
+    #[error("cryptography failure in ed25519")]
+    EdCryptoError,
     /// Opaque errors wrapper for secp256k1 crate
-    /// #Transparent errors
+    /// #Transparent errors cannot be used with WASM
     ///
     /// Serde crate errors
-    #[error(transparent)]
-    Serde(#[from] serde_json::error::Error),
+    #[error("Serde json serialization failure")]
+    Serde,
     /// utf8 conversion errors
-    #[error(transparent)]
-    Utf8(#[from] std::str::Utf8Error),
+    #[error("Utf8 conversion error")]
+    Utf8,
     /// Other errors implementing `std::error::Error`
-    #[error(transparent)]
-    Other(#[from] Box<dyn std::error::Error>)
+    #[error("Generic failure")]
+    Other
 }
 
 #[cfg(test)]

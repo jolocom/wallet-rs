@@ -18,8 +18,10 @@ use chacha20poly1305::{
         NewAead,
     },
 };
+use wasm_bindgen::prelude::*;
 
 /// Represents unlocked wallet with it's content in raw form
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize)]
 pub struct UnlockedWallet {
     /// JSON-LD `@context` key-value pair
@@ -34,6 +36,7 @@ pub struct UnlockedWallet {
     contents: Contents,
 }
 
+#[wasm_bindgen]
 impl UnlockedWallet {
     /// Constructs new instance with provided ID
     ///

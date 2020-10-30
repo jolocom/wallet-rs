@@ -14,8 +14,10 @@ use chacha20poly1305::{
         NewAead
     },
 };
+use wasm_bindgen::prelude::*;
 
 /// Represents wallet in locked (encrypted) state
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize)]
 pub struct LockedWallet {
     /// Wallet ID
@@ -24,6 +26,7 @@ pub struct LockedWallet {
     pub ciphertext: Vec<u8>,
 }
 
+#[wasm_bindgen]
 impl LockedWallet {
     /// Instantiates encrypted wallet from ID and ciphertext
     ///
