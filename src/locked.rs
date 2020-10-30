@@ -48,7 +48,7 @@ impl LockedWallet {
     ///
     /// * key - password to decrypt content with
     ///
-    pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, Error> {
+    pub fn unlock(&self, key: &[u8]) -> Result<UnlockedWallet, JsValue> {
         let mut sha3 = Sha3_256::new();
         sha3.update(key);
         let pass = sha3.finalize();

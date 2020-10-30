@@ -2,12 +2,14 @@ use serde::{
     Deserialize,
     Serialize
 };
+use wasm_bindgen::prelude::*;
 
 /// Entropy type for JSON serialization
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Entropy {
     #[serde(rename = "type")]
-    pub entropy_type: Vec<String>,
+    pub entropy_type: Box<[JsValue]>,
     #[serde(with = "serde_base_64")]
     value: Vec<u8>,
 }

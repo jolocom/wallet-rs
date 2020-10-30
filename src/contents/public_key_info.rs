@@ -10,14 +10,16 @@ use k256::ecdsa::{
     signature::Signer,
     recoverable
 };
+use wasm_bindgen::prelude::*;
 use crate::Error;
 
 /// Holds public information on key, controller and type of the key.
 ///
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKeyInfo {
     /// key controller information.
-    pub controller: Vec<String>,
+    pub controller: Box<[JsValue]>,
     #[serde(rename = "type")]
     /// variant of `KeyType` representing type of the key.
     pub key_type: KeyType,
@@ -203,6 +205,7 @@ impl PublicKeyInfo {
 
 /// Lists all supported* keys.
 /// TODO: find links to all the key specs.
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum KeyType {
     /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#jsonwebsignature2020{

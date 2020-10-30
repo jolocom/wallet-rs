@@ -4,19 +4,21 @@ pub mod key_pair;
 pub mod public_key_info;
 
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
+use wasm_bindgen::prelude::*;
 
 use public_key_info::PublicKeyInfo;
 use std::collections::hash_map::*;
 use uuid::Uuid;
 
+#[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContentEntity {
     #[serde(rename = "@context", default)]
-    pub context: Vec<String>,
+    pub context: Box<[JsValue]>,
     pub id: String,
 
     #[serde(flatten)]
-    pub content: Content,
+    pub content: JsValue,
 }
 
 impl ContentEntity {
@@ -38,7 +40,7 @@ pub enum Content {
 }
 
 impl Content {
-    pub fn to_entity(&self, id: &str) -> ContentEntity {
+    fn to_entity(&self, id: &str) -> ContentEntity {
         content_to_entity(self, id)
     }
 }

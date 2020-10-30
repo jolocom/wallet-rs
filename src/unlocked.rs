@@ -26,12 +26,12 @@ use wasm_bindgen::prelude::*;
 pub struct UnlockedWallet {
     /// JSON-LD `@context` key-value pair
     #[serde(rename = "@context")]
-    pub context: Vec<String>,
+    pub context: Box<[JsValue]>,
     /// Wallet ID
     pub id: String,
     /// Type of the wallet. JSON property `type`
     #[serde(rename = "type")]
-    pub wallet_type: Vec<String>,
+    pub wallet_type: Box<[JsValue]>,
     /// Wallet `Contents`
     contents: Contents,
 }
@@ -69,7 +69,7 @@ impl UnlockedWallet {
         &mut self,
         key_type: KeyType,
         key_controller: Option<Vec<String>>,
-    ) -> Result<ContentEntity, Error> {
+    ) -> Result<ContentEntity, JsValue> {
         let kp = KeyPair::random_pair(key_type)
             .map_err(|e| Error::Other(Box::new(e)))?;
         let pk = kp.public_key.clone();
@@ -157,7 +157,7 @@ impl UnlockedWallet {
     /// * key_ref - key to be fetched and signed with
     /// * data - message to be signed by selected key
     ///
-    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_raw(&self, key_ref: &str, data: &[u8]) -> Result<Vec<u8>, JsValue> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.sign(data),
@@ -175,7 +175,7 @@ impl UnlockedWallet {
     /// * data - cipher to be decrypted
     /// * aad - `Option` to be used for AAD algorithm
     ///
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: Option<&[u8]>) -> Result<Vec<u8>, Error> {
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: Option<&[u8]>) -> Result<Vec<u8>, JsValue> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.decrypt(data, aad),
@@ -191,7 +191,7 @@ impl UnlockedWallet {
     ///
     /// * key - secret key (password) for the encription
     ///
-    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, Error> {
+    pub fn lock(&self, key: &[u8]) -> Result<LockedWallet, JsValue> {
         let mut sha3 = Sha3_256::new();
         sha3.update(key);
         let pass = sha3.finalize();
@@ -210,7 +210,6 @@ impl UnlockedWallet {
             ciphertext: cypher
         })
     }
-
 }
 
 // generates random `XNonce`
