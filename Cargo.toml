@@ -9,7 +9,7 @@ license = "Apache-2.0"
 homepage = "https://jolocom.com/"
 repository = "https://github.com/jolocom/wallet-rs"
 readme = "README.md"
-keywords = ["keri", "SSI", "jolocom", "blockchain", "did", "wallet"]
+keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
