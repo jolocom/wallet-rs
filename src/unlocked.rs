@@ -94,7 +94,9 @@ impl UnlockedWallet {
     ///
     /// * content - `Content` refference to be added to the wallet
     ///
-    pub fn import_content(&mut self, content: &Content) -> Option<ContentEntity> {
+    // # Wasm parameters
+    // &JsValue => &Content
+    pub fn import_content(&mut self, content: &JsValue) -> Option<ContentEntity> {
         self.contents
             .import(content.clone())
             .map(|(id, content)| content.to_entity(&id).clean())

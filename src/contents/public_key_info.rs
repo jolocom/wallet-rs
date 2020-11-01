@@ -28,6 +28,7 @@ pub struct PublicKeyInfo {
     pub public_key: Vec<u8>,
 }
 
+#[wasm_bindgen]
 impl PublicKeyInfo {
     /// Contstructor, which builds instance from `KeyType` and slice
     /// of bytes which are public key of type specified.
@@ -81,7 +82,9 @@ impl PublicKeyInfo {
     ///     .controller(vec!("some new controller".into()));
     /// # }
     /// ```
-    pub fn controller(self, controller: Vec<String>) -> Self {
+    // # Wasm parameters
+    // Box<[JsValue]> => Vec<String>
+    pub fn controller(self, controller: Box<[JsValue]>) -> Self {
         Self {
             controller: controller,
             ..self
@@ -115,7 +118,12 @@ impl PublicKeyInfo {
     ///     let cipher_text = key_pair.public_key.encrypt(b"Super secret message", None)?;
     /// #   Ok(()) 
     /// # }
-    pub fn encrypt(&self, data: &[u8], _aad: Option<&[u8]>) -> Result<Vec<u8>, Error> {
+    // # Wasm parameters
+    // Option<Box<[JsValue]> => Option<&[u8]>
+    // # Wasm return types
+    // Box<[JsValue]> => Vec<u8>
+    // JsValue => Error
+    pub fn encrypt(&self, data: &[u8], _aad: Option<Box<[JsValue]>>) -> Result<Box<[JsValue]>, JsValue> {
         match self.key_type {
             // default use xChaCha20Poly1905
             KeyType::X25519KeyAgreementKey2019 => {
@@ -155,7 +163,8 @@ impl PublicKeyInfo {
     ///     assert!(key_pair.public_key.verify(b"Not so secret stuff", &signature)?);
     /// #   Ok(()) 
     /// # }
-    pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
+    // JsValue => Error
+    pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
         match self.key_type {
             KeyType::Ed25519VerificationKey2018 => {
                 use ed25519_dalek::{PublicKey, Verifier, Signature};
