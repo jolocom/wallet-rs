@@ -163,6 +163,7 @@ impl PublicKeyInfo {
     ///     assert!(key_pair.public_key.verify(b"Not so secret stuff", &signature)?);
     /// #   Ok(()) 
     /// # }
+    // # Wasm return types
     // JsValue => Error
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
         match self.key_type {

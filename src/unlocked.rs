@@ -65,10 +65,12 @@ impl UnlockedWallet {
     /// * key_type - `KeyType` of desired new keypair to be generated
     /// * key_controller - Optional controller information
     ///
+    // # Wasm parameters
+    // Option<Box<[JsValue]> -> Option<Vec<String>>
     pub fn new_key(
         &mut self,
         key_type: KeyType,
-        key_controller: Option<Vec<String>>,
+        key_controller: Option<Box<[JsValue]>>,
     ) -> Result<ContentEntity, JsValue> {
         let kp = KeyPair::random_pair(key_type)
             .map_err(|e| Error::Other(Box::new(e)))?;
@@ -138,9 +140,9 @@ impl UnlockedWallet {
     /// * key_ref - refference to the target key
     /// * controller - controller information to be attached
     ///
-    pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
+    pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<bool> {
         self.contents.set_key_controller(key_ref, controller)?;
-        Some(())
+        Some(true)
     }
 
     /// Returns `Vec` of `ContentEntity` from the wallet
@@ -177,7 +179,9 @@ impl UnlockedWallet {
     /// * data - cipher to be decrypted
     /// * aad - `Option` to be used for AAD algorithm
     ///
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: Option<&[u8]>) -> Result<Vec<u8>, JsValue> {
+    // # Wasm parameters
+    // Option<Box<&[JsValue]>> -> Option<&[u8]>
+    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: Option<&Box<[JsValue]>) -> Result<Vec<u8>, JsValue> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.decrypt(data, aad),
