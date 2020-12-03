@@ -1,3 +1,5 @@
+use rand_core::{OsRng, RngCore};
+
 #[macro_use]
 extern crate arrayref;
 extern crate aead;
@@ -17,6 +19,13 @@ pub mod prelude {
     };
     pub use crate::locked::LockedWallet;
     pub use crate::unlocked::UnlockedWallet;
+}
+
+/// Helpful for generating bytes using the operating system random number generator
+pub fn get_random(bytes: usize) -> Result<Vec<u8>, Error> {
+    let mut value = vec![0u8; bytes];
+    OsRng.fill_bytes(value.as_mut_slice());
+    Ok(value)
 }
 
 /// Wrapper enum for proper error handling
