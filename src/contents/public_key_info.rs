@@ -252,7 +252,7 @@ pub enum KeyType {
 }
 
 impl FromStr for KeyType {
-    type Err = String;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -264,7 +264,7 @@ impl FromStr for KeyType {
             "X25519KeyAgreementKey2019" => Ok(Self::X25519KeyAgreementKey2019),
             "SchnorrSecp256k1VerificationKey2019" => Ok(Self::SchnorrSecp256k1VerificationKey2019),
             "EcdsaSecp256k1RecoveryMethod2020" => Ok(Self::EcdsaSecp256k1RecoveryMethod2020),
-            _ => Err("No Such Key Type".to_string()),
+            _ => Err(Error::UnsupportedKeyType),
         }
     }
 }
