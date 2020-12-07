@@ -175,8 +175,12 @@ impl PublicKeyInfo {
     ///     let signature = base64::decode_config(
     ///         "dxolMmEAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
     ///         base64::URL_SAFE)?;
+    ///#     let wrong_sig = base64::decode_config(
+    ///#         "dxolAAAAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
+    ///#         base64::URL_SAFE)?;
     ///     let pki = PublicKeyInfo::new(KeyType::EcdsaSecp256k1VerificationKey2019, &key?);
     ///     assert!(pki.verify(message, &signature)?);
+    ///#     assert!(!pki.verify(message, &wrong_sig)?);
     /// # Ok(())}
     /// ```
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
