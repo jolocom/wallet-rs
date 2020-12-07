@@ -153,6 +153,32 @@ impl PublicKeyInfo {
     ///     assert!(key_pair.public_key.verify(b"Not so secret stuff", &signature)?);
     /// #   Ok(()) 
     /// # }
+    /// ```
+    /// EcdsaSecp256k1 verification test:
+    /// ```
+    /// # use crate::{
+    /// #    universal_wallet::{
+    /// #       contents::{
+    /// #           public_key_info::{
+    /// #               KeyType,
+    /// #               PublicKeyInfo,
+    /// #           },
+    /// #           key_pair::KeyPair,
+    /// #       },
+    /// #   Error,
+    /// #   }
+    /// # };
+    /// # fn test() -> Result<(), Error> {
+    ///     let key = base64::decode_config("Aw2CKxqxbAH5CJK5fo0LqnREgJQYYsFcAocCKX7TrUmp",
+    ///         base64::URL_SAFE);
+    ///     let message = "hello there".as_bytes();
+    ///     let signature = base64::decode_config(
+    ///         "dxolMmEAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
+    ///         base64::URL_SAFE)?;
+    ///     let pki = PublicKeyInfo::new(KeyType::EcdsaSecp256k1VerificationKey2019, &key?);
+    ///     assert!(pki.verify(message, &signature)?);
+    /// # Ok(())}
+    /// ```
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
         match self.key_type {
             KeyType::Ed25519VerificationKey2018 => {
