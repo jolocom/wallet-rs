@@ -168,6 +168,7 @@ impl PublicKeyInfo {
     /// #   Error,
     /// #   }
     /// # };
+    /// # use std::str::FromStr;
     /// # fn test() -> Result<(), Error> {
     ///     let key = base64::decode_config("Aw2CKxqxbAH5CJK5fo0LqnREgJQYYsFcAocCKX7TrUmp",
     ///         base64::URL_SAFE);
@@ -178,7 +179,7 @@ impl PublicKeyInfo {
     ///#     let wrong_sig = base64::decode_config(
     ///#         "dxolAAAAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
     ///#         base64::URL_SAFE)?;
-    ///     let pki = PublicKeyInfo::new(KeyType::EcdsaSecp256k1VerificationKey2019, &key?);
+    ///     let pki = PublicKeyInfo::new(KeyType::from_str("EcdsaSecp256k1VerificationKey2019")?, &key?);
     ///     assert!(pki.verify(message, &signature)?);
     ///#     assert!(!pki.verify(message, &wrong_sig)?);
     /// # Ok(())}
@@ -269,6 +270,24 @@ impl FromStr for KeyType {
     }
 }
 
+impl TryInto<KeyType> for &str {
+    type Error = Error ;
+
+    fn try_into(self) -> Result<KeyType, Error> {
+        match self {
+            "JwsVerificationKey2020" => Ok(KeyType::JwsVerificationKey2020),
+            "EcdsaSecp256k1VerificationKey2019" => Ok(KeyType::EcdsaSecp256k1VerificationKey2019),
+            "Ed25519VerificationKey2018" => Ok(KeyType::Ed25519VerificationKey2018),
+            "GpgVerificationKey2020" => Ok(KeyType::GpgVerificationKey2020),
+            "RsaVerificationKey2018" => Ok(KeyType::RsaVerificationKey2018),
+            "X25519KeyAgreementKey2019" => Ok(KeyType::X25519KeyAgreementKey2019),
+            "SchnorrSecp256k1VerificationKey2019" => Ok(KeyType::SchnorrSecp256k1VerificationKey2019),
+            "EcdsaSecp256k1RecoveryMethod2020" => Ok(KeyType::EcdsaSecp256k1RecoveryMethod2020),
+            _ => Err(Error::UnsupportedKeyType),
+        }
+    }
+}
+
 /// Defines encoding for public keys.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -312,4 +331,15 @@ pub fn parse_concatenated(signature: &[u8]) -> Result<recoverable::Signature, Er
     println!("{:?}", v);
 
     to_recoverable_signature(v, &r, &s)
+}
+
+#[test]
+fn key_type_from_str_test() -> Result<(), Error> {
+    // Arrange + Act
+    let kt = KeyType::from_str("EcdsaSecp256k1VerificationKey2019")?;
+    let kt2: KeyType = "EcdsaSecp256k1VerificationKey2019".try_into()?;
+    // Assert
+    assert_eq!(KeyType::EcdsaSecp256k1VerificationKey2019, kt);
+    assert_eq!(kt, kt2);
+    Ok(())
 }
