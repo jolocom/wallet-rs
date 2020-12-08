@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use k256::ecdsa::{
     self,
     SigningKey,
+    Signature,
+    VerifyingKey,
     signature::Signer,
     recoverable
 };
@@ -200,13 +202,11 @@ impl PublicKeyInfo {
                 Ok(pk.verify(data, &signature).is_ok())
             },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                use k256::ecdsa::{Signature, VerifyKey, signature::Verifier};
-                let vk = VerifyKey::new(array_ref!(&self.public_key, 0, 32))
-                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                let vk = VerifyingKey::from_sec1_bytes(&self.public_key)?;
                 let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
                 let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
-                let sign = Signature::from_scalars(s1, s2)
-                    .map_err(|e| Error::EdCryptoError(e))?;
+                let sign = Signature::from_scalars(s1, s2)?;
+                use k256::ecdsa::signature::Verifier;
                 Ok(vk.verify(data, &sign).is_ok())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
@@ -215,7 +215,7 @@ impl PublicKeyInfo {
                 let rs = ecdsa::Signature::from_scalars(s1, s2)
                     .map_err(|e| Error::EdCryptoError(e))?;
                 let recovered_signature = recoverable::Signature::from_trial_recovery(
-                    &ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?,
+                    &ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key)?,
                     data,
                     &rs
                 ).map_err(|oe| Error::EcdsaCryptoError(oe))?;
@@ -223,7 +223,7 @@ impl PublicKeyInfo {
                 let recovered_key = recovered_signature.recover_verify_key(data)
                     .map_err(|e| Error::EcdsaCryptoError(e))?;
 
-                let our_key = ecdsa::VerifyKey::new(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
+                let our_key = ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
 
                 Ok(our_key == recovered_key)
             }
@@ -351,5 +351,49 @@ fn key_type_from_str_test() -> Result<(), Error> {
     // Assert
     assert_eq!(expected, KeyType::EcdsaSecp256k1VerificationKey2019);
     assert_eq!(kt, kt2);
+    Ok(())
+}
+
+#[test]
+fn ecdsa_signature_test() -> Result<(), Error> {
+    let key = base64::decode_config("Aw2CKxqxbAH5CJK5fo0LqnREgJQYYsFcAocCKX7TrUmp",
+    base64::URL_SAFE);
+    let message = "hello there".as_bytes();
+    let signature = base64::decode_config(
+    "dxolMmEAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
+    base64::URL_SAFE)?;
+    let wrong_sig = base64::decode_config(
+    "dxolAAAAt56BaIgqTdAZ17QmmNcOA9wkmiVNwtVLr_0Ob3r0R2v9lqDMQxF8Pt--Jl9BDDyaxIsYsbAybZv3rw==",
+    base64::URL_SAFE)?;
+    let pki = PublicKeyInfo::new(KeyType::from_str("EcdsaSecp256k1VerificationKey2019")?, &key?);
+    assert!(pki.verify(message, &signature)?);
+    assert!(!pki.verify(message, &wrong_sig)?);
+    Ok(())
+}
+
+#[test]
+fn ecdsa_private_public_keys_full_cycle_test() -> Result<(), Error> {
+    // Arrange
+    use crate::contents::key_pair::KeyPair;
+    let pk = 
+        hex::decode("ebb2c082fd7727890a28ac82f6bdf97bad8de9f5d7c9028692de1a255cad3e0f")
+            .unwrap();
+    let pub_key = 
+        hex::decode("04779dd197a5df977ed2cf6cb31d82d43328b790dc6b3b7d4437a427bd5847dfcde94b724a555b6d017bb7607c3e3281daf5b1699d6ef4124975c9237b917d426f")
+            .unwrap();
+    let expected =
+        hex::decode("46e830fcc9f6cee692752ab1fb7307db7a02f74b6e44fd92faffd3e9e45f5f7b3cadb5fddfc4a794edcd079c9772f48da21eff6590838661de0f21cb6bf5fdb1")
+            .unwrap();
+    let message =
+        hex::decode("4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a")
+            .unwrap();
+    let pki = PublicKeyInfo::new(KeyType::EcdsaSecp256k1VerificationKey2019, &pub_key);
+    let mut kp = KeyPair::new(KeyType::EcdsaSecp256k1VerificationKey2019, &pk)?;
+    kp.public_key = pki;
+    // Act
+    let sign = kp.sign(&message)?;
+    // Assert
+    assert_eq!(&expected, &sign);
+    assert!(&kp.public_key.verify(&message, &sign)?);
     Ok(())
 }

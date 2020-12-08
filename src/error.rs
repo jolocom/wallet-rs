@@ -28,8 +28,8 @@ pub enum Error {
     /// Opaque errors wrapper for aead crate
     #[error("cryptography failure in aead: {0}")]
     AeadCryptoError(aead::Error),
-    #[error("cryptography failure in ecdsa: {0}")]
-    EcdsaCryptoError(k256::ecdsa::Error),
+    #[error(transparent)]
+    EcdsaCryptoError(#[from] k256::ecdsa::Error),
     #[error("cryptography failure in ed25519: {0}")]
     EdCryptoError(ed25519_dalek::ed25519::Error),
     /// Opaque errors wrapper for secp256k1 crate

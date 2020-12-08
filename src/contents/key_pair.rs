@@ -3,7 +3,6 @@ use super::public_key_info::{KeyType, PublicKeyInfo};
 use k256::{
     ecdsa::{
         SigningKey,
-        VerifyKey,
         Signature,
         signature::Signer,
         recoverable,
@@ -57,9 +56,8 @@ impl KeyPair {
             },
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let sign_key = SigningKey::new(priv_key)
-                    .map_err(|e| Error::EcdsaCryptoError(e))?;
-                let verify_key = VerifyKey::from(&sign_key);
+                let sign_key = SigningKey::from_bytes(priv_key)?;
+                let verify_key = sign_key.verify_key();
                 (verify_key.to_bytes().to_vec(), 
                 sign_key.to_bytes().iter_mut().map(|v| *v).collect::<Vec<u8>>())
             },
@@ -117,7 +115,7 @@ impl KeyPair {
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let sign_key = SigningKey::random(&mut OsRng);
-                (VerifyKey::from(&sign_key).to_bytes().to_vec(), sign_key.to_bytes().to_vec())
+                (sign_key.verify_key().to_bytes().to_vec(), sign_key.to_bytes().to_vec())
             },
             _ => return Err(Error::UnsupportedKeyType),
         };
@@ -161,14 +159,12 @@ impl KeyPair {
                 Ok(sig.to_bytes().into())
              },
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                let sign_key = SigningKey::new(&self.private_key)
-                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                let sign_key = SigningKey::from_bytes(&self.private_key)?;
                 let signature: Signature = sign_key.sign(data);
                 Ok(signature.as_ref().to_vec())
             },
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let sign_key = SigningKey::new(&self.private_key[..])
-                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                let sign_key = SigningKey::from_bytes(&self.private_key[..])?;
                 // WARN: Signature type must be annotated to be recoverable!
                 let signature: recoverable::Signature = sign_key.sign(data);
                 Ok(signature.as_ref().to_vec())
