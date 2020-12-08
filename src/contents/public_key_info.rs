@@ -234,21 +234,27 @@ impl PublicKeyInfo {
 
 /// Lists all supported* keys.
 /// TODO: find links to all the key specs.
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#jsonwebsignature2020)
+/// `JwsVerificationKey2020`
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1signature2019)
+/// `EcdsaSecp256k1VerificationKey2019`
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ed25519)
+/// `Ed25519VerificationKey2018`
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#gpgsignature2020)
+/// `GpgVerificationKey2020`
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#rsasignature2018)
+/// `RsaVerificationKey2018`
+/// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1recoverysignature2020)
+/// `EcdsaSecp256k1RecoveryMethod2020`
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum KeyType {
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#jsonwebsignature2020{
     JwsVerificationKey2020,
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1signature2019)
     EcdsaSecp256k1VerificationKey2019,
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ed25519)
     Ed25519VerificationKey2018,
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#gpgsignature2020)
     GpgVerificationKey2020,
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#rsasignature2018)
     RsaVerificationKey2018,
     X25519KeyAgreementKey2019,
     SchnorrSecp256k1VerificationKey2019,
-    /// [W3C](https://w3c-ccg.github.io/ld-cryptosuite-registry/#ecdsasecp256k1recoverysignature2020)
     EcdsaSecp256k1RecoveryMethod2020,
 }
 
@@ -338,8 +344,12 @@ fn key_type_from_str_test() -> Result<(), Error> {
     // Arrange + Act
     let kt = KeyType::from_str("EcdsaSecp256k1VerificationKey2019")?;
     let kt2: KeyType = "EcdsaSecp256k1VerificationKey2019".try_into()?;
+    let expected = KeyType::EcdsaSecp256k1VerificationKey2019;
+    println!("{:?}", &expected);
+    println!("{:?}", kt);
+    println!("{:?}", kt2);
     // Assert
-    assert_eq!(KeyType::EcdsaSecp256k1VerificationKey2019, kt);
+    assert_eq!(expected, KeyType::EcdsaSecp256k1VerificationKey2019);
     assert_eq!(kt, kt2);
     Ok(())
 }
