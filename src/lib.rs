@@ -10,8 +10,6 @@ extern crate thiserror;
 pub mod contents;
 pub mod locked;
 pub mod unlocked;
-#[cfg(feature = "didcomm")]
-pub mod didcomm;
 mod error;
 
 pub mod prelude {
