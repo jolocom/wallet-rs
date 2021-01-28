@@ -46,5 +46,9 @@ pub enum Error {
     Base64DecodeError(#[from] base64::DecodeError),
     /// Other errors implementing `std::error::Error`
     #[error(transparent)]
-    Other(#[from] Box<dyn std::error::Error>)
+    Other(#[from] Box<dyn std::error::Error>),
+    /// Didcomm `error::Error` wrapper
+    #[cfg(feature = "didcomm")]
+    #[error(transparent)]
+    DidcommError(#[from] didcomm_rs::Error),
 }
