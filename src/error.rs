@@ -18,6 +18,8 @@ pub enum Error {
     /// Content type is incorrect in current context
     #[error("incorrect content type")]
     ContentTypeIncorrect,
+    #[error("content with id {0} not found in the wallet")]
+    ContentNotFound(String),
     /// Internal encryption errors
     #[error("Box is to small")]
     BoxToSmall,
