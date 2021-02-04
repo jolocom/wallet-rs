@@ -22,7 +22,7 @@ impl UnlockedWallet {
     /// * `message` - fully populated JSON serialized `Message` ready for sealing;
     /// * `header` - JSON serialized `DidcommHeader`. Ready for send.
     ///
-    pub fn seal_signed_message(&self, key_id: &str, sign_key_id: &str, message: &str, header: &str)
+    pub fn seal_signed(&self, key_id: &str, sign_key_id: &str, message: &str, header: &str)
         -> Result<String, Error> {
             if let Some(kp) = self.contents.get(sign_key_id) {
                 match kp {
