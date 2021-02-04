@@ -3,6 +3,10 @@ use crate::{
     locked::LockedWallet,
     Error,
 };
+use chacha20poly1305::{
+    aead::{Aead, NewAead},
+    XChaCha20Poly1305, XNonce,
+};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -10,14 +14,7 @@ use sha3::{
     Digest,
     Sha3_256
 };
-use chacha20poly1305::{
-    XNonce,
-    XChaCha20Poly1305,
-    aead::{
-        Aead,
-        NewAead,
-    },
-};
+
 #[cfg(feature = "didcomm")]
 mod didcomm;
 
@@ -69,8 +66,7 @@ impl UnlockedWallet {
         key_type: KeyType,
         key_controller: Option<Vec<String>>,
     ) -> Result<ContentEntity, Error> {
-        let kp = KeyPair::random_pair(key_type)
-            .map_err(|e| Error::Other(Box::new(e)))?;
+        let kp = KeyPair::random_pair(key_type).map_err(|e| Error::Other(Box::new(e)))?;
         let pk = kp.public_key.clone();
         let key_pair = Content::KeyPair(kp.set_controller(match key_controller {
             Some(c) => c,
@@ -80,7 +76,7 @@ impl UnlockedWallet {
                     ]
                     .join("#")
                     .to_string()],
-                }));
+        }));
         self.contents
             .import(key_pair)
             .map(|(id, content)| content.to_entity(&id).clean())
@@ -174,10 +170,31 @@ impl UnlockedWallet {
     /// * data - cipher to be decrypted
     /// * aad - `Option` to be used for AAD algorithm
     ///
-    pub fn decrypt(&self, key_ref: &str, data: &[u8], aad: Option<&[u8]>) -> Result<Vec<u8>, Error> {
+    pub fn decrypt(
+        &self,
+        key_ref: &str,
+        data: &[u8],
+        aad: Option<&[u8]>,
+    ) -> Result<Vec<u8>, Error> {
         match self.contents.get(key_ref) {
             Some(c) => match &c {
                 Content::KeyPair(k) => k.decrypt(data, aad),
+                _ => Err(Error::ContentTypeIncorrect),
+            },
+            None => Err(Error::KeyNotFound),
+        }
+    }
+
+    /// Performs ECDH Key Agreement
+    ///
+    /// # Parameters
+    ///
+    /// * key_ref - private key for ECDH
+    /// * key - public key for ECDH
+    pub fn ecdh_key_agreement(&self, key_ref: &str, key: &[u8]) -> Result<Vec<u8>, Error> {
+        match self.contents.get(key_ref) {
+            Some(c) => match &c {
+                Content::KeyPair(k) => k.ecdh_key_agreement(key),
                 _ => Err(Error::ContentTypeIncorrect),
             },
             None => Err(Error::KeyNotFound),
@@ -196,20 +213,19 @@ impl UnlockedWallet {
         let pass = sha3.finalize();
 
         let cha_cha = XChaCha20Poly1305::new(&pass);
-        let mut nonce = get_nonce();//XNonce::from_slice(self.id.as_bytes());
+        let mut nonce = get_nonce(); //XNonce::from_slice(self.id.as_bytes());
         let mut cypher = cha_cha
-        .encrypt(
-            &nonce,
-            to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
-        )
-        .map_err(|e| Error::AeadCryptoError(e))?;
+            .encrypt(
+                &nonce,
+                to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
+            )
+            .map_err(|e| Error::AeadCryptoError(e))?;
         cypher.append(&mut nonce.iter_mut().map(|v| *v).collect());
         Ok(LockedWallet {
             id: self.id.clone(),
-            ciphertext: cypher
+            ciphertext: cypher,
         })
     }
-
 }
 
 // generates random `XNonce`
