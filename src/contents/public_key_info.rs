@@ -20,11 +20,11 @@ use crate::Error;
 pub struct PublicKeyInfo {
     /// key controller information.
     pub controller: Vec<String>,
-    #[serde(rename = "type")]
     /// variant of `KeyType` representing type of the key.
+    #[serde(rename = "type")]
     pub key_type: KeyType,
-    #[serde(rename = "publicKeyHex")]
     /// vector of bytes of public key.
+    #[serde(rename = "publicKeyHex", with = "hex")]
     pub public_key: Vec<u8>,
 }
 
