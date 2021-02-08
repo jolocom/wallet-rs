@@ -16,6 +16,7 @@ pub struct KeyPair {
     #[serde(flatten)]
     pub public_key: PublicKeyInfo,
     /// Private key in form of vector of bytes.
+    #[serde(rename = "privateKeyHex", with = "hex")]
     private_key: Vec<u8>,
 }
 
@@ -56,7 +57,7 @@ impl KeyPair {
             }
             KeyType::X25519KeyAgreementKey2019 => {
                 let secret = StaticSecret::from(array_ref!(priv_key, 0, 32).to_owned());
-                let pk = *PublicKey::from(&secret).as_bytes();
+                let pk = PublicKey::from(&secret).to_bytes();
                 (pk.to_vec(), secret.to_bytes().to_vec())
             }
             _ => return Err(Error::UnsupportedKeyType),
@@ -333,5 +334,24 @@ fn ecdh_test_2() -> Result<(), Error> {
     let test_kp = KeyPair::new(KeyType::X25519KeyAgreementKey2019, &sk)?;
 
     assert_eq!(test_kp.ecdh_key_agreement(&pk)?, ak);
+    Ok(())
+}
+
+#[test]
+fn key_deser() -> Result<(), Error> {
+    let content = r#"{"controller":["ecdh_key"],"type":"X25519KeyAgreementKey2019","publicKeyHex":"8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a","privateKeyHex":"77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"}"#;
+    let kp: KeyPair = serde_json::from_str(content)?;
+
+    assert_eq!(
+        kp.private_key,
+        hex::decode("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a").unwrap()
+    );
+    assert_eq!(
+        kp.public_key.public_key,
+        hex::decode("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a").unwrap()
+    );
+    assert_eq!(kp.public_key.key_type, KeyType::X25519KeyAgreementKey2019);
+    assert_eq!(kp.public_key.controller, vec!["ecdh_key".to_string()]);
+
     Ok(())
 }
