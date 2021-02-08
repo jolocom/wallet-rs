@@ -18,6 +18,8 @@ pub enum Error {
     /// Content type is incorrect in current context
     #[error("incorrect content type")]
     ContentTypeIncorrect,
+    #[error("content with id {0} not found in the wallet")]
+    ContentNotFound(String),
     /// Internal encryption errors
     #[error("Box is to small")]
     BoxToSmall,
@@ -46,5 +48,9 @@ pub enum Error {
     Base64DecodeError(#[from] base64::DecodeError),
     /// Other errors implementing `std::error::Error`
     #[error(transparent)]
-    Other(#[from] Box<dyn std::error::Error>)
+    Other(#[from] Box<dyn std::error::Error>),
+    /// Didcomm `error::Error` wrapper
+    #[cfg(feature = "didcomm")]
+    #[error(transparent)]
+    DidcommError(#[from] didcomm_rs::Error),
 }

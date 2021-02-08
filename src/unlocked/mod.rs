@@ -10,7 +10,13 @@ use chacha20poly1305::{
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use sha3::{Digest, Sha3_256};
+use sha3::{
+    Digest,
+    Sha3_256
+};
+
+#[cfg(feature = "didcomm")]
+mod didcomm;
 
 /// Represents unlocked wallet with it's content in raw form
 #[derive(Serialize, Deserialize)]
