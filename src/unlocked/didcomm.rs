@@ -2,7 +2,7 @@ extern crate didcomm_rs;
 
 use std::convert::TryInto;
 use crypto_box::PublicKey;
-use didcomm_rs::{DidcommHeader, Jwk, KeyAlgorithm, Message, crypto::{SignatureAlgorithm, Signer}};
+use didcomm_rs::{DidcommHeader, Jwk, KeyAlgorithm, Message, crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer}};
 use x25519_dalek::{StaticSecret};
 use crate::{prelude::*, Error, unlocked::UnlockedWallet, contents::Content};
 
@@ -24,9 +24,9 @@ impl UnlockedWallet {
     ///
     pub fn seal_signed(&self, key_id: &str, sign_key_id: &str, message: &str, header: &str)
         -> Result<String, Error> {
-            if let Some(kp) = self.contents.get(sign_key_id) {
+            if let Some(kp) = self.contents.get_by_controller(sign_key_id) {
                 match kp {
-                    Content::KeyPair(kp) => {
+                    (_, Content::KeyPair(kp)) => {
                         let mut jws = Message::new()
                             .set_didcomm_header(serde_json::from_str(header)?);
                         let mut key = Jwk::new();
@@ -80,13 +80,13 @@ impl UnlockedWallet {
     /// controller = "did:keri:ulc'3hu/l'390/rl'acehu/#kid"
     pub fn seal_encrypted(&self, key_id: &str, message: &str, header: &str)
         -> Result<String, Error> {
-        if let Some(ekp) = self.contents.get(key_id) {
+        if let Some(ekp) = self.contents.get_by_controller(key_id) {
             match ekp {
-                Content::KeyPair(ekp) => {
+                (_, Content::KeyPair(ekp)) => {
                     let mut e_key = Jwk::new();
                     match ekp.public_key.key_type {
                         KeyType::X25519KeyAgreementKey2019 => {
-                            e_key.crv = Some(String::from("x25519"));
+                            e_key.crv = Some(String::from("ECDH-ES+A256KW"));
                             e_key.kid = Some(calc_kid(&self.id, &ekp.public_key.controller[0]));
                             e_key.add_other_header(String::from("x"), base64::encode(&ekp.public_key.public_key));
                         },
@@ -94,10 +94,11 @@ impl UnlockedWallet {
                     }
                     let mut jwe = Message::new();
                     jwe.jwm_header.kid = e_key.kid.clone();
-                    jwe.jwm_header.alg = Some(e_key.alg.to_string());
+                    jwe.jwm_header.alg = Some(String::from("ECDH-ES+A256KW"));
                     jwe.jwm_header.cty = Some(String::from("JWM"));
                     jwe.jwm_header.jwk = Some(e_key);
                     jwe.set_didcomm_header(serde_json::from_str(header)?)
+                        
                         .body(message.as_bytes())
                         .seal(&ekp.private_key())
                         .map_err(|e| Error::DidcommError(e))
