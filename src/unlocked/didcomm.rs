@@ -2,8 +2,8 @@ extern crate didcomm_rs;
 
 use std::convert::TryInto;
 use crypto_box::PublicKey;
-use didcomm_rs::{DidcommHeader, Jwk, KeyAlgorithm, Message, crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer}};
-use x25519_dalek::{StaticSecret};
+use didcomm_rs::{DidcommHeader, Jwk, KeyAlgorithm, Message, crypto::{SignatureAlgorithm, Signer}};
+use x25519_dalek::StaticSecret;
 use crate::{prelude::*, Error, unlocked::UnlockedWallet, contents::Content};
 
 impl UnlockedWallet {
@@ -18,13 +18,13 @@ impl UnlockedWallet {
     /// All JWE related headers along with proper algorithm should be set in `message`.
     /// # Parameters
     /// * `key_id` - identifier of the `Content` to be used for encryption;
-    /// * `sign_key_id` - identifier of the `Content` to be used for signing;
+    /// * `sign_key_controller` - identifier of the `Content` to be used for signing;
     /// * `message` - fully populated JSON serialized `Message` ready for sealing;
     /// * `header` - JSON serialized `DidcommHeader`. Ready for send.
     ///
-    pub fn seal_signed(&self, key_id: &str, sign_key_id: &str, message: &str, header: &str)
+    pub fn seal_signed(&self, key_id: &str, sign_key_controller: &str, message: &str, header: &str)
         -> Result<String, Error> {
-            if let Some(kp) = self.contents.get_by_controller(sign_key_id) {
+            if let Some(kp) = self.contents.get_by_controller(sign_key_controller) {
                 match kp {
                     (_, Content::KeyPair(kp)) => {
                         let mut jws = Message::new()
@@ -74,13 +74,13 @@ impl UnlockedWallet {
     }
     /// Signt `Message` into JWS and then seal it into `JWE` using didcomm_rs crypto
     /// # Parameters
-    /// * `key_id` - identifier of the `Content` to be used for encryption;
+    /// * `key_controller` - identifier of the `Content` to be used for encryption;
     /// * `message` - fully populated JSON serialized `Message` ready for sealing;
     /// * `header` - JSON serialized `DidcommHeader`. Ready for send.
     /// controller = "did:keri:ulc'3hu/l'390/rl'acehu/#kid"
-    pub fn seal_encrypted(&self, key_id: &str, message: &str, header: &str)
+    pub fn seal_encrypted(&self, key_controller: &str, message: &str, header: &str)
         -> Result<String, Error> {
-        if let Some(ekp) = self.contents.get_by_controller(key_id) {
+        if let Some(ekp) = self.contents.get_by_controller(key_controller) {
             match ekp {
                 (_, Content::KeyPair(ekp)) => {
                     let mut e_key = Jwk::new();
