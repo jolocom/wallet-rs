@@ -17,7 +17,7 @@ pub struct KeyPair {
     pub public_key: PublicKeyInfo,
     /// Private key in form of vector of bytes.
     #[serde(rename = "privateKeyHex", with = "hex")]
-    private_key: Vec<u8>,
+    pub(crate) private_key: Vec<u8>,
 }
 
 impl KeyPair {

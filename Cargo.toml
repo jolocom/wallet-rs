@@ -15,7 +15,7 @@ keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-didcomm-rs = { version = "0.2", optional = true }
+didcomm-rs = { version = "0.2.4", features = ["resolve"], optional = true }
 thiserror = "1.0"
 rand_core = "0.5.1"
 arrayref = "0.3.6"
@@ -44,6 +44,7 @@ bs58 = "0.4"
 
 [dev-dependencies]
 hex = "0.4.2"
+base58 = "0.1"
 
 [features]
 default = [ "didcomm" ]

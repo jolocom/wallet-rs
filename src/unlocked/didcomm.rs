@@ -1,9 +1,4 @@
-extern crate didcomm_rs;
-
-use std::convert::TryInto;
-use crypto_box::PublicKey;
-use didcomm_rs::{DidcommHeader, Jwk, KeyAlgorithm, Message, crypto::{SignatureAlgorithm, Signer}};
-use x25519_dalek::StaticSecret;
+use didcomm_rs::{DdoParser, Jwe, Jwk, KeyAlgorithm, Message, crypto::{SignatureAlgorithm, Signer}, resolve_any, try_resolve_any};
 use crate::{prelude::*, Error, unlocked::UnlockedWallet, contents::Content};
 
 impl UnlockedWallet {
@@ -22,13 +17,22 @@ impl UnlockedWallet {
     /// * `message` - fully populated JSON serialized `Message` ready for sealing;
     /// * `header` - JSON serialized `DidcommHeader`. Ready for send.
     ///
-    pub fn seal_signed(&self, key_id: &str, sign_key_controller: &str, message: &str, header: &str)
+    pub fn seal_signed(&self, message: &str)
         -> Result<String, Error> {
-            if let Some(kp) = self.contents.get_by_controller(sign_key_controller) {
+            let m: Message = serde_json::from_str(message)?;
+            let document = try_resolve_any(&m.get_didcomm_header().from.clone().unwrap_or_default())
+                .map_err(|e| Error::Other(e.into()))?;
+            let ekp: Option<(String, &Content)> =
+                if let Some(ka) = document.find_key_agreement("Ed25519") {
+                    if let Some(kp) = self.contents.get_by_controller(&ka.controller) {
+                        Some(kp)
+                    } else { None }
+                } else { None };
+            if let Some(kp) = ekp {
                 match kp {
                     (_, Content::KeyPair(kp)) => {
                         let mut jws = Message::new()
-                            .set_didcomm_header(serde_json::from_str(header)?);
+                            .set_didcomm_header(m.get_didcomm_header().to_owned());
                         let mut key = Jwk::new();
                         let alg: SignatureAlgorithm;
                         match kp.public_key.key_type {
@@ -64,7 +68,7 @@ impl UnlockedWallet {
                         jws.jwm_header.jwk = Some(key);
                         jws = jws.body(message.as_bytes());
                         self
-                            .seal_encrypted(key_id, &jws.sign(alg.signer(), &kp.private_key())?, header)
+                            .seal_encrypted(&jws.sign(alg.signer(), &kp.private_key())?)
                     },
                 _ => Err(Error::KeyNotFound),
                 }
@@ -78,9 +82,18 @@ impl UnlockedWallet {
     /// * `message` - fully populated JSON serialized `Message` ready for sealing;
     /// * `header` - JSON serialized `DidcommHeader`. Ready for send.
     /// controller = "did:keri:ulc'3hu/l'390/rl'acehu/#kid"
-    pub fn seal_encrypted(&self, key_controller: &str, message: &str, header: &str)
+    pub fn seal_encrypted(&self, message: &str)
         -> Result<String, Error> {
-        if let Some(ekp) = self.contents.get_by_controller(key_controller) {
+        let m: Message = serde_json::from_str(message)?;
+        let document = try_resolve_any(&m.get_didcomm_header().from.clone().unwrap_or_default())
+            .map_err(|e| Error::Other(e.into()))?;
+        let ekp: Option<(String, &Content)> =
+            if let Some(controller) = document.find_public_key_controller_for_curve("X25519") {
+                if let Some(kp) = self.contents.get_by_controller(&controller) {
+                    Some(kp)
+                } else { None }
+            } else { None };
+        if let Some(ekp) = ekp {
             match ekp {
                 (_, Content::KeyPair(ekp)) => {
                     let mut e_key = Jwk::new();
@@ -97,8 +110,7 @@ impl UnlockedWallet {
                     jwe.jwm_header.alg = Some(String::from("ECDH-ES+A256KW"));
                     jwe.jwm_header.cty = Some(String::from("JWM"));
                     jwe.jwm_header.jwk = Some(e_key);
-                    jwe.set_didcomm_header(serde_json::from_str(header)?)
-                        
+                    jwe.set_didcomm_header(m.get_didcomm_header().to_owned())
                         .body(message.as_bytes())
                         .seal(&ekp.private_key())
                         .map_err(|e| Error::DidcommError(e))
@@ -112,26 +124,17 @@ impl UnlockedWallet {
     /// Processes JWS or JWE from bytes sent by the sender
     /// Returns instance of raw `Message`
     ///
-    pub fn receive_message(&self, msg_bytes: &[u8], sender_public_key: &[u8], verifying_key: Option<&[u8]>) -> Result<Message, Error> {
-        let h: DidcommHeader = serde_json::from_slice(msg_bytes)?;
-        if let Some(kp) = self.get_content_from_header(&h.to) {
+    pub fn receive_message(&self, msg_bytes: &[u8]) -> Result<Message, Error> {
+        let jwe: Jwe = serde_json::from_slice(msg_bytes)?;
+        if let Some(kp) = self.get_content_from_header(&jwe.to().to_vec()) {
             match kp {
                 Content::KeyPair(unwrapped_kp) => {
-                    let pk = unwrapped_kp.private_key();
-                    let arr: [u8; 32] = pk.as_slice().try_into()
-                        .map_err(|_| Error::WrongKeyLength)?;
-                    let pk_arr: [u8; 32] = sender_public_key.try_into()
-                            .map_err(|_| Error::WrongKeyLength)?;
-                    let public = PublicKey::from(pk_arr);
-                    let shared = StaticSecret::from(arr)
-                        .diffie_hellman(&public);
                     Ok(Message::receive(
-                    &String::from_utf8_lossy(msg_bytes),
-                    Some(shared.as_bytes()), 
-                    verifying_key
+                        &String::from_utf8_lossy(msg_bytes),
+                        &unwrapped_kp.private_key(),
                     )?)
                 },
-                _ => return Err(Error::ContentNotFound(h.to.iter().map(|s| s.to_owned()).collect::<String>()))
+                _ => return Err(Error::ContentNotFound(jwe.to().iter().map(|s| s.to_owned()).collect::<String>()))
             }
         } else {
             Err(Error::DidcommError(didcomm_rs::Error::JweParseError))
@@ -139,16 +142,18 @@ impl UnlockedWallet {
     }
 
     // helper method to parse keypair `Content` id from incomming `kid`
-    fn get_content_from_header(&self, ids: &Vec<String>) -> Option<&Content> {
+    fn get_content_from_header(&self, ids: &[String]) -> Option<Content> {
         for id in ids {
-            let all: Vec<&str> = id.split("#").collect();
-            if all.len() != 2 {
+            if let Some(document) = resolve_any(id) {
+                if let Some(controller) = document.find_public_key_controller_for_curve("X25519") {
+                    match self.contents.get_by_controller(&controller) {
+                        Some(v) => return Some(v.1.to_owned()),
+                        None => continue
+                    }
+                } else { continue; }
+            } else {
                 continue;
             }
-            let r = self.contents.get(all[1]);
-            if let Some(c) = r {
-                return Some(c);
-            } else { continue; }
         }
         None
     }
@@ -160,4 +165,38 @@ fn calc_kid(id: &str, cntrlr: &str) -> String {
     [id, cntrlr].join("#")
 }
 
+#[test]
+fn send_receive_test() {
+    // Arrange
+    use base58::FromBase58;
 
+    let m = Message::new()
+        .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+        .to(vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"))
+        .as_jwe(&didcomm_rs::crypto::CryptoAlgorithm::XC20P);
+
+    let mut alice_wallet = UnlockedWallet::new("alice");
+    let alice_didkey_content = Content::KeyPair(KeyPair {
+        public_key: PublicKeyInfo::new(KeyType::X25519KeyAgreementKey2019, &"7By6kV2t2d188odEM4ExAve1UithKT6dLva4dwsDT3ak".from_base58().unwrap()),
+        private_key: "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap()
+    }.set_controller(vec!("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp".into())));
+    let alice_import = alice_wallet.import_content(&alice_didkey_content);
+
+    let mut bob_wallet = UnlockedWallet::new("bob");
+    let bob_didkey_content = Content::KeyPair(KeyPair {
+        public_key: PublicKeyInfo::new(KeyType::X25519KeyAgreementKey2019, &"FcoNC5NqP9CePWbhfz95iHaEsCjGkZUioK9Ck7Qiw286".from_base58().unwrap()),
+        private_key: "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap()
+    }.set_controller(vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG".into())));
+    let bob_import = bob_wallet.import_content(&bob_didkey_content);
+
+    // Act
+    let alice_encrypted_message = alice_wallet.seal_encrypted(&serde_json::to_string(&m).unwrap());
+    assert!(alice_encrypted_message.is_ok());
+
+    let bob_received_message = bob_wallet.receive_message(&alice_encrypted_message.unwrap().as_bytes());
+
+    // Assert
+    assert!(alice_import.is_some());
+    assert!(bob_import.is_some());
+    assert!(bob_received_message.is_ok());
+}
