@@ -1,6 +1,6 @@
 [package]
 name = "universal_wallet"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>",
             "Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
