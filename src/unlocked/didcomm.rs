@@ -1,4 +1,4 @@
-use didcomm_rs::{DdoParser, Jwe, Jwk, KeyAlgorithm, Message, crypto::{SignatureAlgorithm, Signer}, resolve_any, try_resolve_any};
+use didcomm_rs::{DdoParser, Jwe, Jwk, KeyAlgorithm, Message, crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer}, resolve_any, try_resolve_any};
 use crate::{prelude::*, Error, unlocked::UnlockedWallet, contents::Content};
 
 impl UnlockedWallet {
@@ -8,6 +8,12 @@ impl UnlockedWallet {
         Message::new()
             .as_raw_json()
             .unwrap() // this should never fail
+    }
+    pub fn create_jwe_message(from: &str, to: &[&str], alg: CryptoAlgorithm) -> String {
+        serde_json::to_string(&Message::new()
+            .to(to)
+            .from(from)
+            .as_jwe(&alg)).unwrap()
     }
     /// Takes instance of JSON `Message` as a &str and encrypts it using provided `key_id`.
     /// All JWE related headers along with proper algorithm should be set in `message`.
@@ -172,7 +178,7 @@ fn send_receive_test() {
 
     let m = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-        .to(vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"))
+        .to(&vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"))
         .as_jwe(&didcomm_rs::crypto::CryptoAlgorithm::XC20P);
 
     let mut alice_wallet = UnlockedWallet::new("alice");

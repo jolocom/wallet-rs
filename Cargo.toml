@@ -45,6 +45,7 @@ bs58 = "0.4"
 [dev-dependencies]
 hex = "0.4.2"
 base58 = "0.1"
+sodiumoxide = "0.2.6"
 
 [features]
 default = [ "didcomm" ]
