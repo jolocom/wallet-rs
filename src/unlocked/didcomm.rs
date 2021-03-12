@@ -9,6 +9,8 @@ impl UnlockedWallet {
             .as_raw_json()
             .unwrap() // this should never fail
     }
+    /// Constructor of Message as JWE with `to` and `from` headers population
+    ///
     pub fn create_jwe_message(from: &str, to: &[&str], alg: CryptoAlgorithm) -> String {
         serde_json::to_string(&Message::new()
             .to(to)
