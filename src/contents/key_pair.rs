@@ -45,7 +45,7 @@ impl KeyPair {
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let sign_key = SigningKey::from_bytes(priv_key)?;
-                let verify_key = sign_key.verify_key();
+                let verify_key = sign_key.verifying_key();
                 (
                     verify_key.to_bytes().to_vec(),
                     sign_key
@@ -110,9 +110,9 @@ impl KeyPair {
             }
             KeyType::EcdsaSecp256k1VerificationKey2019
             | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
-                let sign_key = SigningKey::random(&mut OsRng);
+                let sign_key = SigningKey::random(&mut rand::rngs::OsRng);
                 (
-                    sign_key.verify_key().to_bytes().to_vec(),
+                    sign_key.verifying_key().to_bytes().to_vec(),
                     sign_key.to_bytes().to_vec(),
                 )
             }

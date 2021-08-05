@@ -38,7 +38,7 @@ pub fn seal_box(
     data: &[u8],
     rk: &PublicKey,
 ) -> Result<Vec<u8>, Error> {
-    let sk = SecretKey::generate(&mut OsRng);
+    let sk = SecretKey::generate(&mut rand::rngs::OsRng);
     let pk = PublicKey::from(&sk);
     let nonce = &Blake2b::new().chain(&pk.as_bytes()).chain(&rk.as_bytes()).finalize()[..24];
     let b = make_box(data, rk, &sk, nonce)?;
@@ -103,7 +103,7 @@ pub const KEYSIZE: usize = 32;
 
 #[test]
 fn too_short() -> Result<(), Error> {
-    let sk = SecretKey::generate(&mut OsRng);
+    let sk = SecretKey::generate(&mut rand::rngs::OsRng);
 
     let message = b"bla";
 
@@ -115,10 +115,10 @@ fn too_short() -> Result<(), Error> {
 #[test]
 fn round_trip() -> Result<(), Error> {
     //
-    let ask = SecretKey::generate(&mut OsRng);
+    let ask = SecretKey::generate(&mut rand::rngs::OsRng);
     let akp = (PublicKey::from(&ask), ask);
 
-    let sk = SecretKey::generate(&mut OsRng);
+    let sk = SecretKey::generate(&mut rand::rngs::OsRng);
     let bkp = (PublicKey::from(&sk), sk);
 
     let message = b"hello there";

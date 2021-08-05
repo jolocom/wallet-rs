@@ -315,7 +315,7 @@ pub fn to_recoverable_signature(
     r: &[u8; 32],
     s: &[u8; 32],
 ) -> Result<recoverable::Signature, Error> {
-    let s_key = SigningKey::random(OsRng);
+    let s_key = SigningKey::random(rand::rngs::OsRng);
     let mut data = [0u8; 64];
     data[0..32].copy_from_slice(r);
     data[32..64].copy_from_slice(s);

@@ -78,12 +78,12 @@ impl Contents {
 
     pub fn get_by_controller(&self, controller: &str) -> Option<(String, &Content)> {
         self.0.iter().find_map(|(id, content)| match content {
-            Content::PublicKey(pk) if pk.controller.iter().any(|c| c == controller) => {
-                Some((id.to_string(), content))
-            }
             Content::KeyPair(kp) if kp.public_key.controller.iter().any(|c| c == controller) => {
                 Some((id.to_string(), content))
-            }
+            },
+            Content::PublicKey(pk) if pk.controller.iter().any(|c| c == controller) => {
+                Some((id.to_string(), content))
+            },
             _ => None,
         })
     }
