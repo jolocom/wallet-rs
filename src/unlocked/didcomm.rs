@@ -182,7 +182,7 @@ fn send_receive_test() {
 
     let m = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-        .to(&vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"))
+        .to(&vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"))
         .as_jwe(&didcomm_rs::crypto::CryptoAlgorithm::XC20P);
 
     let mut alice_wallet = UnlockedWallet::new("alice");
