@@ -1,6 +1,6 @@
 [package]
 name = "universal_wallet"
-version = "0.4.4"
+version = "0.5.0"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>",
             "Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
@@ -16,7 +16,7 @@ keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
 
 [dependencies]
 # didcomm-rs = { version = "0.4.0", features = ["resolve"], optional = true }
-didcomm-rs = { path = "../didcomm-rs", features = ["resolve"], optional = true }
+didcomm-rs = { version = "0.6", optional = true }
 thiserror = "1.0"
 rand_core = { version = "0.5", features = ["getrandom"] }
 rand = "0.8"
@@ -40,7 +40,7 @@ uuid = { version = "0.8", features = ["v4"] }
 sha3 = "0.9.1"
 blake2 = "0.9.0"
 # Encode/Decode
-hex = { version = "0.4.2", features = ["serde"]}
+hex = { version = "0.4", features = ["serde"]}
 base64 = "0.13"
 bs58 = "0.4"
 sled = "0.34.6"
@@ -51,6 +51,6 @@ base58 = "0.1"
 sodiumoxide = "0.2.6"
 
 [features]
-default = [ "didcomm" ]
+default = []
 didcomm = [ "didcomm-rs" ]
 

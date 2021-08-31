@@ -2,7 +2,6 @@ use super::encryption::{KEYSIZE, seal_box};
 use core::str::FromStr;
 use std::convert::TryInto;
 use crypto_box::PublicKey;
-use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use k256::ecdsa::{
     self,
