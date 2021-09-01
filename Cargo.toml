@@ -30,7 +30,7 @@ k256 = { version = "0.9", features = ["ecdsa", "ecdsa-core", "sha256", "keccak25
 ed25519-dalek = "1.0.1"
 # Encryption crates
 aead = "0.4.1"
-crypto_box = "0.6.0"
+crypto_box = "0.7.0"
 ### for x86/x86_64 CPUs use flags: RUSTFLAGS="-Ctarget-feature=+avx2"
 ### idealy use haswell or skylake as baseline: RUSTFLAGS="-Ctarget-cpu=haswell -Ctarget-feature=+avx2"
 x25519-dalek = "1.1.0"
