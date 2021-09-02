@@ -1,6 +1,6 @@
 [package]
 name = "universal_wallet"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>",
             "Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
@@ -15,32 +15,35 @@ keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-didcomm-rs = { version = "0.3.0", features = ["resolve"], optional = true }
+# didcomm-rs = { version = "0.4.0", features = ["resolve"], optional = true }
+didcomm-rs = { version = "0.6", optional = true }
 thiserror = "1.0"
-rand_core = "0.5.1"
+rand_core = { version = "0.5", features = ["getrandom"] }
+rand = "0.8"
 arrayref = "0.3.6"
 generic-array = "0.14.4"
 # Serialize/Deserialize
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # Signing crates
-k256 = { version = "0.7", features = ["ecdsa", "ecdsa-core", "sha256", "keccak256", "zeroize"]}
+k256 = { version = "0.9", features = ["ecdsa", "ecdsa-core", "sha256", "keccak256", "zeroize"]}
 ed25519-dalek = "1.0.1"
 # Encryption crates
-aead = "0.3.2"
-crypto_box = "0.5.0"
+aead = "0.4.1"
+crypto_box = "0.7.0"
 ### for x86/x86_64 CPUs use flags: RUSTFLAGS="-Ctarget-feature=+avx2"
 ### idealy use haswell or skylake as baseline: RUSTFLAGS="-Ctarget-cpu=haswell -Ctarget-feature=+avx2"
 x25519-dalek = "1.1.0"
-chacha20poly1305 = "0.7"
+chacha20poly1305 = "0.8"
 # Hashing crates
 uuid = { version = "0.8", features = ["v4"] }
 sha3 = "0.9.1"
 blake2 = "0.9.0"
 # Encode/Decode
-hex = { version = "0.4.2", features = ["serde"]}
+hex = { version = "0.4", features = ["serde"]}
 base64 = "0.13"
 bs58 = "0.4"
+sled = "0.34.6"
 
 [dev-dependencies]
 hex = "0.4.2"
@@ -48,6 +51,6 @@ base58 = "0.1"
 sodiumoxide = "0.2.6"
 
 [features]
-default = [ "didcomm" ]
+default = []
 didcomm = [ "didcomm-rs" ]
 

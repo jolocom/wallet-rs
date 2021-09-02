@@ -95,7 +95,6 @@ impl UnlockedWallet {
             .map(|(id, content)| content.to_entity(&id).clean())
     }
 
-    // TODO: What exactly happening here?
     pub fn set_content(&mut self, cref: &str, content: Content) -> Option<ContentEntity> {
         self.contents
             .insert(cref, content)
@@ -134,6 +133,10 @@ impl UnlockedWallet {
     pub fn set_key_controller(&mut self, key_ref: &str, controller: &str) -> Option<()> {
         self.contents.set_key_controller(key_ref, controller)?;
         Some(())
+    }
+
+    pub fn get_content_by_controller(&self, controller: &str) -> Option<&Content> {
+        self.contents.get(controller)
     }
 
     /// Returns `Vec` of `ContentEntity` from the wallet

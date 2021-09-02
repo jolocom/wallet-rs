@@ -21,6 +21,8 @@ pub mod prelude {
     pub use crate::locked::LockedWallet;
     pub use crate::unlocked::UnlockedWallet;
 }
+#[cfg(feature = "didcomm")]
+pub use didcomm_rs;
 
 pub use error::Error as Error;
 
