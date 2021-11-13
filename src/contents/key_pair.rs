@@ -108,11 +108,21 @@ impl KeyPair {
                 let kp = Keypair::generate(&mut OsRng);
                 (kp.public.as_bytes().to_vec(), kp.secret.as_bytes().to_vec())
             }
-            KeyType::EcdsaSecp256k1VerificationKey2019
-            | KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
+            KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
                 let sign_key = SigningKey::random(&mut rand::rngs::OsRng);
                 (
                     sign_key.verifying_key().to_bytes().to_vec(),
+                    sign_key.to_bytes().to_vec(),
+                )
+            }
+            KeyType::EcdsaSecp256k1VerificationKey2019 => {
+                let sign_key = p256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+                (
+                    sign_key
+                        .verifying_key()
+                        .to_encoded_point(false)
+                        .as_bytes()
+                        .to_vec(),
                     sign_key.to_bytes().to_vec(),
                 )
             }
@@ -157,8 +167,8 @@ impl KeyPair {
                 Ok(sig.to_bytes().into())
             }
             KeyType::EcdsaSecp256k1VerificationKey2019 => {
-                let sign_key = SigningKey::from_bytes(&self.private_key)?;
-                let signature: Signature = sign_key.sign(data);
+                let sign_key = p256::ecdsa::SigningKey::from_bytes(&self.private_key)?;
+                let signature: p256::ecdsa::Signature = sign_key.sign(data);
                 Ok(signature.as_ref().to_vec())
             }
             KeyType::EcdsaSecp256k1RecoveryMethod2020 => {
