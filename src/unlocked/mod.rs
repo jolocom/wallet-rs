@@ -10,10 +10,7 @@ use chacha20poly1305::{
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use sha3::{
-    Digest,
-    Sha3_256
-};
+use sha3::{Digest, Sha3_256};
 
 #[cfg(feature = "didcomm")]
 mod didcomm;
@@ -136,7 +133,9 @@ impl UnlockedWallet {
     }
 
     pub fn get_content_by_controller(&self, controller: &str) -> Option<&Content> {
-        self.contents.get(controller)
+        self.contents
+            .get_by_controller(controller)
+            .and_then(|(_, c)| Some(c))
     }
 
     /// Returns `Vec` of `ContentEntity` from the wallet
