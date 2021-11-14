@@ -164,6 +164,23 @@ impl UnlockedWallet {
         }
     }
 
+    /// Signs message with te keypair selected by it's controller
+    ///
+    /// # Parameters
+    ///
+    /// * `controller' - Keypair content controller
+    /// * `data` - payload to be signed
+    ///
+    pub fn sign_raw_by_controller(&self, controller: &str, data: &[u8]) -> Result<Vec<u8>, Error> {
+        match self.contents.get_by_controller(controller) {
+            Some(c) => match &c.1 {
+                Content::KeyPair(kp) => kp.sign(data),
+                _ => Err(Error::ContentTypeIncorrect),
+            },
+            None => Err(Error::KeyNotFound),
+        }
+    }
+
     /// Decrypts provided cypher text using desired key by refference
     ///
     /// # Parameters
