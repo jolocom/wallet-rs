@@ -1,6 +1,6 @@
 [package]
 name = "universal_wallet"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Charles Cunningham <c.a.cunningham6@gmail.com>",
             "Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
@@ -19,7 +19,7 @@ keywords = ["keri", "SSI", "jolocom", "did", "wallet"]
 didcomm-rs = { version = "0.6", optional = true }
 thiserror = "1.0"
 rand_core = { version = "0.5", features = ["getrandom"] }
-rand = "0.8"
+rand = { version = "0.8", features = ["getrandom"] }
 arrayref = "0.3.6"
 generic-array = "0.14.4"
 # Serialize/Deserialize
@@ -28,6 +28,7 @@ serde_json = "1.0"
 # Signing crates
 k256 = { version = "0.9", features = ["ecdsa", "ecdsa-core", "sha256", "keccak256", "zeroize"]}
 ed25519-dalek = "1.0.1"
+signature_bls = "0.21"
 # Encryption crates
 aead = "0.4.1"
 crypto_box = "0.7.0"

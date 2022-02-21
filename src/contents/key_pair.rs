@@ -116,6 +116,20 @@ impl KeyPair {
                     sign_key.to_bytes().to_vec(),
                 )
             }
+            KeyType::Bls12381G1Key2020 => {
+                use signature_bls::{PublicKeyVt, SecretKey};
+                let sk = SecretKey::random(&mut rand::rngs::OsRng)
+                    .ok_or(Error::BlsCryptoError("failed to generate random SK".into()))?;
+                let pk = PublicKeyVt::from(&sk);
+                (pk.to_bytes().to_vec(), sk.to_bytes().to_vec())
+            }
+            KeyType::Bls12381G2Key2020 => {
+                use signature_bls::{PublicKey, SecretKey};
+                let sk = SecretKey::random(&mut rand::rngs::OsRng)
+                    .ok_or(Error::BlsCryptoError("failed to generate random SK".into()))?;
+                let pk = PublicKey::from(&sk);
+                (pk.to_bytes().to_vec(), sk.to_bytes().to_vec())
+            }
             _ => return Err(Error::UnsupportedKeyType),
         };
 
@@ -166,6 +180,13 @@ impl KeyPair {
                 // WARN: Signature type must be annotated to be recoverable!
                 let signature: recoverable::Signature = sign_key.sign(data);
                 Ok(signature.as_ref().to_vec())
+            }
+            KeyType::Bls12381G1Key2020 | KeyType::Bls12381G2Key2020 => {
+                use signature_bls::{SecretKey as BlsSecretKey, Signature as BlsSignature};
+                let sk = BlsSecretKey::from_bytes(array_ref!(&self.private_key, 0, 32)).unwrap();
+                let sig = BlsSignature::new(&sk, data)
+                    .ok_or(Error::BlsCryptoError("payload signing failed".into()))?;
+                Ok(sig.to_bytes().to_vec())
             }
             _ => Err(Error::WrongKeyType),
         }
