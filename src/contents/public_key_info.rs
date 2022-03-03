@@ -225,6 +225,16 @@ impl PublicKeyInfo {
                 let our_key = ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
 
                 Ok(our_key == recovered_key)
+            },
+            KeyType::Bls12381G1Key2020 => {
+                use signature_bls::{SignatureVt, PublicKeyVt};
+                let pk = PublicKeyVt::from_bytes(array_ref!(&self.public_key, 0, 48)).unwrap();
+                Ok(SignatureVt::from_bytes(array_ref!(signature, 0, 96)).unwrap().verify(pk, signature).unwrap_u8() == 1u8)
+            },
+            KeyType::Bls12381G2Key2020 => {
+                use signature_bls::{Signature, PublicKey};
+                let pk = PublicKey::from_bytes(array_ref!(&self.public_key, 0, 96)).unwrap();
+                Ok(Signature::from_bytes(array_ref!(signature, 0, 48)).unwrap().verify(pk, signature).unwrap_u8() == 1u8)
             }
             _ => Err(Error::WrongKeyType),
         }
@@ -255,6 +265,8 @@ pub enum KeyType {
     X25519KeyAgreementKey2019,
     SchnorrSecp256k1VerificationKey2019,
     EcdsaSecp256k1RecoveryMethod2020,
+    Bls12381G1Key2020,
+    Bls12381G2Key2020
 }
 
 impl FromStr for KeyType {
@@ -270,6 +282,8 @@ impl FromStr for KeyType {
             "X25519KeyAgreementKey2019" => Ok(Self::X25519KeyAgreementKey2019),
             "SchnorrSecp256k1VerificationKey2019" => Ok(Self::SchnorrSecp256k1VerificationKey2019),
             "EcdsaSecp256k1RecoveryMethod2020" => Ok(Self::EcdsaSecp256k1RecoveryMethod2020),
+            "Bls12381G1Key2020" => Ok(Self::Bls12381G1Key2020),
+            "Bls12381G2Key2020" => Ok(Self::Bls12381G2Key2020),
             _ => Err(Error::UnsupportedKeyType),
         }
     }
@@ -288,6 +302,8 @@ impl TryInto<KeyType> for &str {
             "X25519KeyAgreementKey2019" => Ok(KeyType::X25519KeyAgreementKey2019),
             "SchnorrSecp256k1VerificationKey2019" => Ok(KeyType::SchnorrSecp256k1VerificationKey2019),
             "EcdsaSecp256k1RecoveryMethod2020" => Ok(KeyType::EcdsaSecp256k1RecoveryMethod2020),
+            "Bls12381G1Key2020" => Ok(KeyType::Bls12381G1Key2020),
+            "Bls12381G2Key2020" => Ok(KeyType::Bls12381G2Key2020),
             _ => Err(Error::UnsupportedKeyType),
         }
     }

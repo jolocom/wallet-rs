@@ -34,6 +34,8 @@ pub enum Error {
     EcdsaCryptoError(#[from] k256::ecdsa::Error),
     #[error("cryptography failure in ed25519: {0}")]
     EdCryptoError(ed25519_dalek::ed25519::Error),
+    #[error("cryptography failure in BBS/BLS module: {0}")]
+    BlsCryptoError(String),
     /// Opaque errors wrapper for secp256k1 crate
     /// #Transparent errors
     ///
