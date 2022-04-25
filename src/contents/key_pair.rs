@@ -34,11 +34,11 @@ impl KeyPair {
     //  TODO: find proper link for x25519 key
     /// `X25519KeyAgreementKey2019` [W3C](https://www.w3.org/TR/did-core/#key-types-and-formats)<br>
     ///
-    pub fn new(key_type: KeyType, priv_key: &Vec<u8>) -> Result<Self, Error> {
+    pub fn new(key_type: KeyType, priv_key: &[u8]) -> Result<Self, Error> {
         let (pk, sk) = match key_type {
             KeyType::Ed25519VerificationKey2018 => {
-                let sk = ed25519_dalek::SecretKey::from_bytes(priv_key)
-                    .map_err(|e| Error::EdCryptoError(e))?;
+                let sk =
+                    ed25519_dalek::SecretKey::from_bytes(priv_key).map_err(Error::EdCryptoError)?;
                 let pk: ed25519_dalek::PublicKey = (&sk).into();
                 (pk.as_bytes().to_vec(), sk.as_bytes().to_vec())
             }
@@ -119,14 +119,14 @@ impl KeyPair {
             KeyType::Bls12381G1Key2020 => {
                 use signature_bls::{PublicKeyVt, SecretKey};
                 let sk = SecretKey::random(&mut rand::rngs::OsRng)
-                    .ok_or(Error::BlsCryptoError("failed to generate random SK".into()))?;
+                    .ok_or_else(|| Error::BlsCryptoError("failed to generate random SK".into()))?;
                 let pk = PublicKeyVt::from(&sk);
                 (pk.to_bytes().to_vec(), sk.to_bytes().to_vec())
             }
             KeyType::Bls12381G2Key2020 => {
                 use signature_bls::{PublicKey, SecretKey};
                 let sk = SecretKey::random(&mut rand::rngs::OsRng)
-                    .ok_or(Error::BlsCryptoError("failed to generate random SK".into()))?;
+                    .ok_or_else(|| Error::BlsCryptoError("failed to generate random SK".into()))?;
                 let pk = PublicKey::from(&sk);
                 (pk.to_bytes().to_vec(), sk.to_bytes().to_vec())
             }
@@ -166,7 +166,7 @@ impl KeyPair {
                 let mut pk = self.public_key.public_key.clone();
                 let mut spk = self.private_key.clone();
                 spk.append(&mut pk);
-                let kp = Keypair::from_bytes(&spk.as_ref()).map_err(|e| Error::EdCryptoError(e))?;
+                let kp = Keypair::from_bytes(spk.as_ref()).map_err(Error::EdCryptoError)?;
                 let sig = kp.sign(data);
                 Ok(sig.to_bytes().into())
             }
@@ -185,14 +185,14 @@ impl KeyPair {
                 use signature_bls::{SecretKey, Signature};
                 let sk = SecretKey::from_bytes(array_ref!(&self.private_key, 0, 32)).unwrap();
                 let sig = Signature::new(&sk, data)
-                    .ok_or(Error::BlsCryptoError("payload signing failed".into()))?;
+                    .ok_or_else(|| Error::BlsCryptoError("payload signing failed".into()))?;
                 Ok(sig.to_bytes().to_vec())
             }
             KeyType::Bls12381G1Key2020 => {
                 use signature_bls::{SecretKey, SignatureVt};
                 let sk = SecretKey::from_bytes(array_ref!(&self.private_key, 0, 32)).unwrap();
                 let sig = SignatureVt::new(&sk, data)
-                    .ok_or(Error::BlsCryptoError("payload signing failed".into()))?;
+                    .ok_or_else(|| Error::BlsCryptoError("payload signing failed".into()))?;
                 Ok(sig.to_bytes().to_vec())
             }
             _ => Err(Error::WrongKeyType),

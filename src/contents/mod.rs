@@ -54,12 +54,12 @@ fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Contents(HashMap<String, Content>);
 
 impl Contents {
     pub fn new() -> Self {
-        Self(HashMap::<String, Content>::new())
+        Self::default()
     }
 
     pub fn insert(&mut self, id: &str, content: Content) -> Option<&Content> {
@@ -95,7 +95,7 @@ impl Contents {
             match oldk {
                 Content::PublicKey(pk) => Content::PublicKey(PublicKeyInfo {
                     controller: vec![controller.to_string()],
-                    ..pk.clone()
+                    ..pk
                 }),
                 Content::KeyPair(kp) => {
                     Content::KeyPair(kp.set_controller(vec![controller.to_owned()]))
@@ -115,6 +115,12 @@ impl Contents {
             })
             .collect()
     }
+
+    /// Replace the id of associated with an old content.
+    pub fn replace_key(&mut self, old_id: &str, new_id: &str) -> Option<Content> {
+        let value = self.0.remove(old_id)?;
+        self.0.insert(new_id.into(), value)
+    }
 }
 
 impl Serialize for Contents {
@@ -124,7 +130,7 @@ impl Serialize for Contents {
     {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
         for (id, content) in &self.0 {
-            seq.serialize_element(&content_to_entity(&content, &id))?;
+            seq.serialize_element(&content_to_entity(content, id))?;
         }
         seq.end()
     }
