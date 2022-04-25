@@ -43,6 +43,12 @@ impl Content {
     }
 }
 
+impl Default for Contents {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
     ContentEntity {
         context: vec![
@@ -95,7 +101,7 @@ impl Contents {
             match oldk {
                 Content::PublicKey(pk) => Content::PublicKey(PublicKeyInfo {
                     controller: vec![controller.to_string()],
-                    ..pk.clone()
+                    ..pk
                 }),
                 Content::KeyPair(kp) => {
                     Content::KeyPair(kp.set_controller(vec![controller.to_owned()]))
@@ -124,7 +130,7 @@ impl Serialize for Contents {
     {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
         for (id, content) in &self.0 {
-            seq.serialize_element(&content_to_entity(&content, &id))?;
+            seq.serialize_element(&content_to_entity(content, id))?;
         }
         seq.end()
     }

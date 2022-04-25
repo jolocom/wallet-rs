@@ -82,7 +82,7 @@ impl PublicKeyInfo {
     /// ```
     pub fn controller(self, controller: Vec<String>) -> Self {
         Self {
-            controller: controller,
+            controller,
             ..self
         }
     }
@@ -212,17 +212,17 @@ impl PublicKeyInfo {
                 let s1: [u8; 32] = array_ref!(signature, 0, 32).to_owned();
                 let s2: [u8; 32] = array_ref!(signature, 32, 32).to_owned();
                 let rs = ecdsa::Signature::from_scalars(s1, s2)
-                    .map_err(|e| Error::EdCryptoError(e))?;
+                    .map_err( Error::EdCryptoError)?;
                 let recovered_signature = recoverable::Signature::from_trial_recovery(
                     &ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key)?,
                     data,
                     &rs
-                ).map_err(|oe| Error::EcdsaCryptoError(oe))?;
+                ).map_err( Error::EcdsaCryptoError)?;
 
                 let recovered_key = recovered_signature.recover_verify_key(data)
-                    .map_err(|e| Error::EcdsaCryptoError(e))?;
+                    .map_err( Error::EcdsaCryptoError)?;
 
-                let our_key = ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key).map_err(|e| Error::EcdsaCryptoError(e))?;
+                let our_key = ecdsa::VerifyingKey::from_sec1_bytes(&self.public_key).map_err(Error::EcdsaCryptoError)?;
 
                 Ok(our_key == recovered_key)
             },

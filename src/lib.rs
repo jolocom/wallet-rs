@@ -3,14 +3,14 @@ use rand_core::{OsRng, RngCore};
 #[macro_use]
 extern crate arrayref;
 extern crate aead;
-extern crate ed25519_dalek;
 extern crate chacha20poly1305;
+extern crate ed25519_dalek;
 extern crate thiserror;
 
 pub mod contents;
+mod error;
 pub mod locked;
 pub mod unlocked;
-mod error;
 
 pub mod prelude {
     pub use crate::contents::{
@@ -24,7 +24,7 @@ pub mod prelude {
 #[cfg(feature = "didcomm")]
 pub use didcomm_rs;
 
-pub use error::Error as Error;
+pub use error::Error;
 
 /// Helpful for generating bytes using the operating system random number generator
 pub fn get_random(bytes: usize) -> Result<Vec<u8>, Error> {
@@ -35,8 +35,8 @@ pub fn get_random(bytes: usize) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
     use super::error::Error;
+    use crate::prelude::*;
 
     #[test]
     fn secp256k1_recoverable_round_trip() -> Result<(), Error> {
@@ -44,14 +44,12 @@ mod tests {
         let mut w = UnlockedWallet::new("thing is very beautiful!");
         let pk_info = w.new_key(KeyType::EcdsaSecp256k1RecoveryMethod2020, None)?;
 
-        let sig = w.sign_raw(&pk_info.id, &message)?;
+        let sig = w.sign_raw(&pk_info.id, message)?;
 
-        assert!(
-            match pk_info.content {
-                Content::PublicKey(r_pk_inf) => r_pk_inf.verify(&message, &sig)?,
-                _ => false,
-            }
-        );
+        assert!(match pk_info.content {
+            Content::PublicKey(r_pk_inf) => r_pk_inf.verify(message, &sig)?,
+            _ => false,
+        });
         Ok(())
     }
 

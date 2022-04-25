@@ -10,10 +10,7 @@ use chacha20poly1305::{
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use sha3::{
-    Digest,
-    Sha3_256
-};
+use sha3::{Digest, Sha3_256};
 
 #[cfg(feature = "didcomm")]
 mod didcomm;
@@ -74,8 +71,7 @@ impl UnlockedWallet {
                         self.id.clone(),
                         base64::encode_config(pk.public_key, base64::URL_SAFE),
                     ]
-                    .join("#")
-                    .to_string()],
+                    .join("#")],
         }));
         self.contents
             .import(key_pair)
@@ -218,11 +214,8 @@ impl UnlockedWallet {
         let cha_cha = XChaCha20Poly1305::new(&pass);
         let mut nonce = get_nonce(); //XNonce::from_slice(self.id.as_bytes());
         let mut cypher = cha_cha
-            .encrypt(
-                &nonce,
-                to_string(&self).map_err(|e| Error::Serde(e))?.as_bytes(),
-            )
-            .map_err(|e| Error::AeadCryptoError(e))?;
+            .encrypt(&nonce, to_string(&self).map_err(Error::Serde)?.as_bytes())
+            .map_err(Error::AeadCryptoError)?;
         cypher.append(&mut nonce.iter_mut().map(|v| *v).collect());
         Ok(LockedWallet {
             id: self.id.clone(),

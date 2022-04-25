@@ -1,19 +1,12 @@
 use super::unlocked::UnlockedWallet;
 use super::Error;
+use chacha20poly1305::{
+    aead::{Aead, NewAead},
+    XChaCha20Poly1305, XNonce,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
-use sha3::{
-    Digest,
-    Sha3_256
-};
-use chacha20poly1305::{
-    XNonce,
-    XChaCha20Poly1305,
-    aead::{
-        Aead,
-        NewAead
-    },
-};
+use sha3::{Digest, Sha3_256};
 
 /// Represents wallet in locked (encrypted) state
 #[derive(Serialize, Deserialize)]
@@ -56,13 +49,11 @@ impl LockedWallet {
         let nonce = XNonce::from_slice(&self.ciphertext[nonce_start..]);
         let content = &self.ciphertext[..nonce_start];
         let dec = cha_cha
-            .decrypt(&nonce, content)
-            .map_err(|e| Error::AeadCryptoError(e))?;
+            .decrypt(nonce, content)
+            .map_err(Error::AeadCryptoError)?;
 
-        let as_str = std::str::from_utf8(&dec)
-            .map_err(|e| Error::Utf8(e))?;
+        let as_str = std::str::from_utf8(&dec).map_err(Error::Utf8)?;
 
-        from_str(as_str)
-            .map_err(|e| Error::Serde(e))
+        from_str(as_str).map_err(Error::Serde)
     }
 }
