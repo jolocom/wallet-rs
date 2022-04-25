@@ -97,6 +97,11 @@ impl UnlockedWallet {
             .map(|content| content.to_entity(cref).clean())
     }
 
+    /// Replaces contents id.
+    pub fn replace_content_id(&mut self, old_id: &str, new_id: &str) -> Option<Content> {
+        self.contents.replace_key(old_id, new_id)
+    }
+
     // TODO: What exactly happening here?
     pub fn get_key(&self, key_ref: &str) -> Option<ContentEntity> {
         self.contents

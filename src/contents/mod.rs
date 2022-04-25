@@ -121,6 +121,12 @@ impl Contents {
             })
             .collect()
     }
+
+    /// Replace the id of associated with an old content.
+    pub fn replace_key(&mut self, old_id: &str, new_id: &str) -> Option<Content> {
+        let value = self.0.remove(old_id)?;
+        self.0.insert(new_id.into(), value)
+    }
 }
 
 impl Serialize for Contents {
