@@ -43,12 +43,6 @@ impl Content {
     }
 }
 
-impl Default for Contents {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
     ContentEntity {
         context: vec![
@@ -60,12 +54,12 @@ fn content_to_entity(content: &Content, id: &str) -> ContentEntity {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Contents(HashMap<String, Content>);
 
 impl Contents {
     pub fn new() -> Self {
-        Self(HashMap::<String, Content>::new())
+        Self::default()
     }
 
     pub fn insert(&mut self, id: &str, content: Content) -> Option<&Content> {
